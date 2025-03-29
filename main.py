@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from middleware.logging import log_middleware
 from middleware.auth import api_key_auth
 from config import settings, configure_logging
+import json
 
 # Initialize logging
 configure_logging()
@@ -70,27 +71,36 @@ async def chat_completions(request: Request):
         # Forward the request body if present
         body = await request.body()
         
+        body_str = body.decode('utf-8')
         # Check if client wants streaming
-        is_streaming = request.query_params.get("stream", "").lower() == "true"
-        
+        is_streaming = json.loads(body_str).get("stream") is True
+        print (f"Is streaming: {is_streaming}")  # Debugging line to see if streaming is requested
+
         if is_streaming:
             # Handle streaming response
-            target_response = await client.stream(
-                "POST",
-                f"{settings.target_server_url}/chat/completions",
-                headers=headers,
-                params=request.query_params,
-                content=body
-            )
-            
             async def stream_generator():
-                async with target_response as response:
+                async with client.stream(
+                    "POST",
+                    f"{settings.target_server_url}/chat/completions",
+                    headers=headers,
+                    params=request.query_params,
+                    content=body,
+                    timeout=None
+                ) as response:
+                    response.raise_for_status()
+                    print(f"Streaming response headers: {response.headers}")
                     async for chunk in response.aiter_bytes():
+                        print(f"Received chunk: {chunk.decode()}")
                         yield chunk
+                    print("Target server stream ended")
             
             return StreamingResponse(
                 stream_generator(),
-                media_type="application/json"
+                media_type="text/event-stream",
+                headers={
+                    "Transfer-Encoding": "chunked",
+                    "X-Accel-Buffering": "no"
+                }
             )
         else:
             # Handle normal response
@@ -100,14 +110,10 @@ async def chat_completions(request: Request):
                 params=request.query_params,
                 content=body
             )
-            return response.json()
-            
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(
-            status_code=e.response.status_code,
-            detail=e.response.text
-        )
+            return response.json()            
+        
     except Exception as e:
+        print( "Error: " + str(e))
         raise HTTPException(
             status_code=500,
             detail=str(e)
@@ -120,5 +126,6 @@ if __name__ == "__main__":
     uvicorn.run(
         app, 
         host="0.0.0.0", 
-        port=int(os.getenv("GATEWAY_PORT", "8000"))
+        port=settings.gateway_port,
+        log_level="debug",
     )

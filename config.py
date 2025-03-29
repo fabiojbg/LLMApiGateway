@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     target_server_url: str | None = os.getenv("TARGET_SERVER_URL")
     target_api_key: str | None = os.getenv("TARGET_API_KEY")
     gateway_api_key: str | None = os.getenv("GATEWAY_API_KEY")
+    gateway_port: int | None = int(9000)
 
     class Config:
         case_sensitive = True
