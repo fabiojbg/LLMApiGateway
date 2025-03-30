@@ -74,7 +74,6 @@ async def chat_completions(request: Request):
         body_str = body.decode('utf-8')
         # Check if client wants streaming
         is_streaming = json.loads(body_str).get("stream") is True
-        print (f"Is streaming: {is_streaming}")  # Debugging line to see if streaming is requested
 
         if is_streaming:
             # Handle streaming response
@@ -88,11 +87,9 @@ async def chat_completions(request: Request):
                     timeout=None
                 ) as response:
                     response.raise_for_status()
-                    print(f"Streaming response headers: {response.headers}")
                     async for chunk in response.aiter_bytes():
-                        print(f"Received chunk: {chunk.decode()}")
+                        print("Chunk: ", chunk)
                         yield chunk
-                    print("Target server stream ended")
             
             return StreamingResponse(
                 stream_generator(),
