@@ -111,7 +111,7 @@ Include/
 pg/
 __pycache__/
 llmgateway/
-
+logs/
 
 # Spyder project settings
 .spyderproject

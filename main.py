@@ -8,7 +8,7 @@ from typing import Optional
 import logging
 from logging.config import dictConfig
 from pydantic import BaseModel
-from middleware.logging import log_middleware
+from middleware.chat_logging import log_chat_completions
 from middleware.auth import api_key_auth
 from config import settings, configure_logging
 import json
@@ -20,8 +20,8 @@ configure_logging()
 app = FastAPI()
 
 # Add middleware
-app.middleware("http")(log_middleware)
 app.middleware("http")(api_key_auth)
+app.middleware("http")(log_chat_completions)
 
 # CORS middleware
 app.add_middleware(
@@ -88,7 +88,6 @@ async def chat_completions(request: Request):
                 ) as response:
                     response.raise_for_status()
                     async for chunk in response.aiter_bytes():
-                        print("Chunk: ", chunk)
                         yield chunk
             
             return StreamingResponse(
