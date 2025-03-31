@@ -1,7 +1,9 @@
 import os
 import json
+import glob
 from datetime import datetime
 from pprint import pformat
+from config import settings
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
 from typing import Callable
@@ -10,14 +12,27 @@ def write_log(req_headers, req_body_str, llm_response_accum):
     # Create log file with the required name format: "YY-MM-DD_HH:MM:ss:mmm.txt"
     log_time = datetime.now()
     filename = log_time.strftime("%Y-%m-%d_%H-%M-%S") + (".%03d" % (log_time.microsecond // 1000)) + ".txt"
+    division_line = "-" * 100
     log_content = (
-        f"-----------------\nRequest Headers:\n-----------------\n\n{pformat(req_headers, indent=2)}\n\n"
-        f"-----------------\nRequest Body:\n-----------------\n\n{req_body_str}\n\n"
-        f"-----------------\nLLM Response:\n-----------------\n\n{llm_response_accum}"
+        f"{division_line}\nRequest Headers:\n{division_line}\n\n{pformat(req_headers, indent=2)}\n\n"
+        f"{division_line}\nRequest Body:\n-{division_line}\n\n{req_body_str}\n\n"
+        f"{division_line}\nLLM Response:\n{division_line}\n\n{llm_response_accum}"
     )
     os.makedirs("logs", exist_ok=True)
-    with open(os.path.join(".\\logs", filename), "w", encoding="utf-8") as f:
+    log_path = os.path.join(".\\logs", filename)
+    
+    # Write the new log file
+    with open(log_path, "w", encoding="utf-8") as f:
         f.write(log_content)
+    
+    # Clean up old logs if over limit
+    log_files = sorted(glob.glob(os.path.join(".\\logs", "*.txt")), key=os.path.getmtime)
+    max_logs = settings.log_file_limit or 50
+    while len(log_files) > max_logs:
+        try:
+            os.remove(log_files.pop(0))
+        except Exception:
+            pass
 
 async def log_chat_completions(request: Request, call_next: Callable) -> Response:
     # Only intercept the "/v1/chat/completions" endpoint

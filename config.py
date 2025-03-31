@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     target_api_key: str | None = os.getenv("TARGET_API_KEY")
     gateway_api_key: str | None = os.getenv("GATEWAY_API_KEY")
     gateway_port: int | None = int(9000)
+    log_file_limit: int | None = int(os.getenv("LOG_FILE_LIMIT", 50))
 
     class Config:
         case_sensitive = True
