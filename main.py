@@ -11,6 +11,15 @@ from middleware.chat_logging import log_chat_completions
 from middleware.auth import api_key_auth
 from config import settings, configure_logging
 import json
+from pathlib import Path
+
+# Load provider mapping
+provider_mapping = []
+try:
+    with open(Path(__file__).parent / "openrouter_provider_mapping.json") as f:
+        provider_mapping = json.load(f)
+except Exception as e:
+    logging.warning(f"Failed to load openrouter_provider_mapping.json: {str(e)}")
 
 # Initialize logging
 configure_logging()
@@ -71,6 +80,19 @@ async def chat_completions(request: Request):
         body = await request.body()
         
         body_str = body.decode('utf-8')
+        try:
+            body_json = json.loads(body_str)
+            # Check if model exists in provider mapping and injection is enabled
+            if settings.provider_injection_enabled and "model" in body_json:
+                for mapping in provider_mapping:
+                    if mapping["model"] == body_json["model"]:
+                        body_json["provider"] = {"order": mapping["providers"]}
+                        body_str = json.dumps(body_json)
+                        body = body_str.encode('utf-8')
+                        break
+        except json.JSONDecodeError:
+            pass  # Maintain original behavior if JSON parsing fails
+            
         # Check if client wants streaming
         is_streaming = json.loads(body_str).get("stream") is True
 
@@ -117,7 +139,6 @@ async def chat_completions(request: Request):
 if __name__ == "__main__":
     import uvicorn
     from config import settings
-    load_dotenv()  # Ensure .env is loaded
     uvicorn.run(
         app, 
         host="0.0.0.0", 

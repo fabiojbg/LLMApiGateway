@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     gateway_api_key: str | None = os.getenv("GATEWAY_API_KEY")
     gateway_port: int | None = int(9000)
     log_file_limit: int | None = int(os.getenv("LOG_FILE_LIMIT", 50))
+    provider_injection_enabled: bool = os.getenv("PROVIDER_INJECTION_ENABLED", "true").lower() == "true"
 
     class Config:
         case_sensitive = True
