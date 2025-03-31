@@ -3,7 +3,6 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import os
-from dotenv import load_dotenv
 from typing import Optional
 import logging
 from logging.config import dictConfig

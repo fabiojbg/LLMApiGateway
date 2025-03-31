@@ -1,0 +1,12 @@
+[
+    {
+        "model": "deepseek/deepseek-chat-v3-0324",
+        "providers": ["deepinfra", "parasail", "hyperbolic"]
+    },
+    {
+        "model": "deepseek/deepseek-chat-v3-0324:free",
+        "providers": ["chutes", "targon"]
+    }
+
+
+]

@@ -1,9 +1,11 @@
 import os
+from dotenv import load_dotenv
 import logging
 from logging.config import dictConfig
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
+    load_dotenv()
     target_server_url: str | None = os.getenv("TARGET_SERVER_URL")
     target_api_key: str | None = os.getenv("TARGET_API_KEY")
     gateway_api_key: str | None = os.getenv("GATEWAY_API_KEY")
