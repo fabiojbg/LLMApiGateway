@@ -1,5 +1,5 @@
 
-# LLM Gateway for OpenRouter with Provider Injection
+# LLM Gateway for OpenRouter with Provider Order Injection
 
 A FastAPI-based proxy for OpenAI-compatible API servers with advanced logging, authentication, and provider mapping. Designed for use with **OpenRouter**, this gateway lets you inject preferred provider orders per model via **openrouter_provider_mapping.json**, enabling OpenRouter to use your specified provider priorities. This resolves the lack of this functionality in OpenRouter, Cline, and RooCode.  [See Provider Mapping section](#provider-mappping).
 The gateway also allows logging all chat requests to the /logs folder to help inspect the messages and the workings of the agents and the models. 
