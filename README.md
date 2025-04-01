@@ -19,13 +19,21 @@ The gateway also allows logging all chat requests to the /logs folder to help in
 - CORS enabled by default
 - Configurable log rotation
 
+## Install Dependencies
+
+Install Python dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+
 ## Configuration
 
 Create `.env` file from example:
 ```bash
 cp .env.example .env
 ```
- .env configuration example for OpenRouter:
+ **.env** configuration example for OpenRouter:
  ```bash
 # Target OpenAI-compatible server URL
 TARGET_SERVER_URL=https://openrouter.ai/api/v1
