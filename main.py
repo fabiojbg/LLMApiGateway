@@ -7,6 +7,7 @@ from typing import Optional
 import logging
 from logging.config import dictConfig
 from pydantic import BaseModel
+from middleware.logging import log_middleware
 from middleware.chat_logging import log_chat_completions
 from middleware.auth import api_key_auth
 from config import settings, configure_logging
@@ -28,8 +29,10 @@ configure_logging()
 app = FastAPI()
 
 # Add middleware
+app.middleware("http")(log_middleware)
 app.middleware("http")(api_key_auth)
-app.middleware("http")(log_chat_completions)
+if settings.log_chat_messages:
+    app.middleware("http")(log_chat_completions)
 
 # CORS middleware
 app.add_middleware(
@@ -142,6 +145,6 @@ if __name__ == "__main__":
     uvicorn.run(
         app, 
         host="0.0.0.0", 
-        port=settings.gateway_port,
+        port=settings.gateway_port, # not working, must be defined in the command line with --port parameter
         log_level="debug",
     )
