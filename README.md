@@ -25,6 +25,27 @@ Create `.env` file from example:
 ```bash
 cp .env.example .env
 ```
+ .env configuration example for OpenRouter:
+ ```bash
+# Target OpenAI-compatible server URL
+TARGET_SERVER_URL=https://openrouter.ai/api/v1
+
+# API key for the target server
+TARGET_API_KEY=<Your OpenRouterKey>
+
+# Fixed API key that clients must use to access this gateway
+# Use it in the Authorization: Bearer <ThisGatewayApiKey>)
+GATEWAY_API_KEY=<ThisGatewayApiKey>
+
+# Maximum number of log files to keep (older files will be deleted)
+LOG_FILE_LIMIT=10
+
+# Enable/Disable automatic model provider order injection (true/false).
+PROVIDER_INJECTION_ENABLED=true
+
+#Enable/disable logging of chat messages to the /logs folder (true/false)
+LOG_CHAT_ENABLED=false
+```
 
 ### Environment Variables
 
