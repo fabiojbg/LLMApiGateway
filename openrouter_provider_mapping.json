@@ -6,9 +6,17 @@
     {
         "model": "deepseek/deepseek-chat-v3-0324:free",
         "providers": ["Chutes", "Targon"]
+    },    
+    {
+        "model": "deepseek/deepseek-r1",
+        "providers": ["DeepInfra", "Parasail", "Nebius"]
+    },    
+    {
+        "model": "deepseek/deepseek-r1:free",
+        "providers": ["Chutes", "Targon"]
     },
     {
-        "model": "valid_options",
+        "model": "valid_options_example",
         "providers": [
               "OpenAI",
               "Anthropic",
