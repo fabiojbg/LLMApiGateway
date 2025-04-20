@@ -23,6 +23,7 @@ def write_log(req_headers, req_body_str, llm_response_accum):
     
     # Write the new log file
     with open(log_path, "w", encoding="utf-8") as f:
+        log_content = log_content.replace("\\n\\n", "\r\n\r\n").replace("\\n", "\r\n")  # replace the sequence \n inside json elements to make it more readable
         f.write(log_content)
     
     # Clean up old logs if over limit
@@ -67,6 +68,10 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
                                 content_piece = choice["delta"]["content"]
                                 if content_piece:
                                     llm_response_accum += content_piece
+                    if "error" in data:
+                        llm_response_accum += decoded_chunk
+                        write_log(req_headers, req_body_str, llm_response_accum)
+                        yield chunk
                 except Exception:
                     pass
                 yield chunk

@@ -94,6 +94,7 @@ async def chat_completions(request: Request):
                         body = body_str.encode('utf-8')
                         break
         except json.JSONDecodeError:
+            print("Failed to decode JSON body: ", body_str)
             pass  # Maintain original behavior if JSON parsing fails
             
         # Check if client wants streaming
@@ -112,6 +113,8 @@ async def chat_completions(request: Request):
                 ) as response:
                     response.raise_for_status()
                     async for chunk in response.aiter_bytes():
+                        if b'"error"' in chunk:
+                            print("Error in stream response: ", chunk)
                         yield chunk
             
             return StreamingResponse(

@@ -9,7 +9,7 @@
     },    
     {
         "model": "deepseek/deepseek-r1",
-        "providers": ["DeepInfra", "Parasail", "Nebius"]
+        "providers": ["Parasail", "DeepInfra", "Nebius"]
     },    
     {
         "model": "deepseek/deepseek-r1:free",
