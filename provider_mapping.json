@@ -48,7 +48,7 @@
     "models":
     [
         {
-            "model": "deepseek/deepseek-chat-v3-03245:free",
+            "model": "deepseek/deepseek-chat-v3-0324:free",
             "providers" :
             [
                 {
