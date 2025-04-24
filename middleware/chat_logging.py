@@ -37,7 +37,8 @@ def write_log(req_headers, req_body_str, llm_response_accum):
 
 async def log_chat_completions(request: Request, call_next: Callable) -> Response:
     # Only intercept the "/v1/chat/completions" endpoint
-    if request.url.path != "/v1/chat/completions":
+    if (request.url.path != "/v1/chat/completions" and 
+        request.url.path != "/v2/chat/completions"):
         return await call_next(request)
     
     # Capture request body and headers

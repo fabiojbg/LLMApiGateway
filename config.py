@@ -6,13 +6,16 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     load_dotenv()
-    target_server_url: str | None = os.getenv("TARGET_SERVER_URL")
-    target_api_key: str | None = os.getenv("TARGET_API_KEY")
+    fallback_provider: str | None = os.getenv("FALLBACK_PROVIDER")
     gateway_api_key: str | None = os.getenv("GATEWAY_API_KEY")
     gateway_port: int | None = int(9000)
     log_file_limit: int | None = int(os.getenv("LOG_FILE_LIMIT", 15))
     provider_injection_enabled: bool = os.getenv("PROVIDER_INJECTION_ENABLED", "true").lower() == "true"
     log_chat_messages: bool = os.getenv("LOG_CHAT_ENABLED", "true").lower() == "true"
+    
+    #keys used by v1 api that uses openrouter_provider_mapping.json
+    target_server_url: str | None = os.getenv("TARGET_SERVER_URL")
+    target_api_key: str | None = os.getenv("TARGET_API_KEY")
 
     class Config:
         case_sensitive = True
