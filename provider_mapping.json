@@ -108,7 +108,7 @@
                 "openrouter":
                 {
                     "modelname" : "google/gemini-2.5-pro-exp-03-25:free",
-                    "providers_order" : ["Google AI Studio", "Google Vertex"]
+                    "providers_order" : ["Google AI Studio", "Google"]
                 }
                 },
                 {
