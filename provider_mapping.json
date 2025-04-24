@@ -4,7 +4,7 @@
         {
             "openrouter":
             {
-                "baseUrl" : "https://openrouter.ai/api2/v1",            
+                "baseUrl" : "https://openrouter.ai/api/v1",            
                 "apikey" : "APIKEY_OPENROUTER"
             }
         },
@@ -93,12 +93,15 @@
                     "requesty":
                     {
                         "models" : [ "novita/deepseek/deepseek-v3-0324", 
-                                      "novita/deepseek/deepseek-v3-turbo",
-                                      "nebius/deepseek-ai/DeepSeek-V3-0324"
+                                     "novita/deepseek/deepseek-v3-turbo",
+                                     "nebius/deepseek-ai/DeepSeek-V3-0324"
                                     ]
                     }
                 }
             ]                    
+        },
+        {
+            "model": ""
         },
         {
             "model": "google/gemini-2.5-pro-exp-03-25:free",
