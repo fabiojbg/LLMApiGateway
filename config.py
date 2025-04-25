@@ -47,7 +47,7 @@ def configure_logging():
         },
         'root': {
             'handlers': ['console', 'file'],
-            'level': 'INFO'
+            'level': 'DEBUG'
         }
     })
 

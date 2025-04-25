@@ -184,7 +184,7 @@ async def chat_completions(request: Request):
 import copy # Added for deep copying request body
 
 # --- Helper Function for making the actual request ---
-async def make_request(target_url: str, headers: dict, payload: dict, is_streaming: bool):
+async def make_v2_request(target_url: str, headers: dict, payload: dict, is_streaming: bool):
     """Makes the downstream request and handles streaming/non-streaming responses."""
     first_chunk = True
     error_in_stream = False
@@ -211,16 +211,13 @@ async def make_request(target_url: str, headers: dict, payload: dict, is_streami
                             # Decode chunk to check content
                             chunk_str = chunk.decode('utf-8')
 
-                            # ---- MODIFICATION START ----
                             # Check if this chunk should be ignored for 'first chunk' error check
-                            if chunk_str.startswith(": OPENROUTER PROCESSING"):
+                            if chunk_str.startswith(": OPENROUTER PROCESSING"): # treat OpenRouter initial and not usefull chunks as ignored
                                 logging.debug(f"Ignoring chunk for first_chunk check: {chunk_str[:100]}...")
                                 # Yield the chunk but skip the first_chunk logic below
                                 if chunk:
-                                    # print(f"Yielding ignored chunk from {target_url}: {chunk[:200]}...") # Optional: less verbose logging
                                     yield chunk
                                 continue # Process next chunk
-                            # ---- MODIFICATION END ----
 
                             # If it's not an ignored chunk AND we are still looking for the first *real* chunk
                             if first_chunk:
@@ -254,11 +251,10 @@ async def make_request(target_url: str, headers: dict, payload: dict, is_streami
 
                         # Yield the current chunk if it's not empty (and wasn't an error chunk that caused a return)
                         if chunk:
-                            # print(f"Yielding chunk from {target_url}: {chunk[:200]}...") # Optional: less verbose logging
                             yield chunk
-                        # else: # No need to log empty chunks unless debugging
-                            # print(f"Skipping empty chunk received from {target_url}")
-                            # pass
+                        else: 
+                            logging.debug(f"Skipping empty chunk received from {target_url}")
+                            pass
 
 
             # Check for error *before* returning the StreamingResponse
@@ -282,13 +278,13 @@ async def make_request(target_url: str, headers: dict, payload: dict, is_streami
                 nonlocal error_in_stream
                 # Yield the first chunk if it was successfully retrieved
                 if not first_chunk and not error_in_stream: # first_chunk is False if priming succeeded
-                    print(f"Yielding first chunk from {target_url}: {first_yield[:200]}...")  
+                    logging.debug(f"Yielding first chunk from {target_url}: {first_yield[:200]}...")  
                     yield first_yield
                 # Yield the rest
                 async for chunk in gen:
-                    print(f"Yielding chunk from {target_url}: {chunk[:200]}...")  
+                    logging.debug(f"Yielding chunk from {target_url}: {chunk[:200]}...")  
                     chunk_str = chunk.decode('utf-8')
-                    if chunk_str.startswith("data:") and '"code":' in chunk_str :
+                    if chunk_str.startswith("data:") and '"code":' in chunk_str : # try if is an error chunk(openrouter)
                             # Attempt to parse as JSON to get detail
                             try:
                                 error_json = json.loads(chunk_str.replace("data: ", "").strip())
@@ -348,6 +344,10 @@ async def chat_completions_v2(request: Request):
     try:
         request_body_bytes = await request.body()
         request_body_json = json.loads(request_body_bytes.decode('utf-8'))
+        
+        payload_to_log = copy.deepcopy(request_body_json)
+        payload_to_log["messages"] = "<REMOVED>" # Remove messages from payload for logging
+        logging.debug(f"Received v2 request for model \'{payload_to_log['model']}\'. Payload: {payload_to_log}") # Log the payload without messages
     except json.JSONDecodeError:
         logging.error("Failed to decode request body JSON", exc_info=True)
         raise HTTPException(status_code=400, detail="Invalid JSON body")
@@ -446,7 +446,7 @@ async def chat_completions_v2(request: Request):
                 payload["allow_fallbacks"] = False
 
                 # Make the request for this specific sub-provider
-                response_data, error_detail = await make_request(target_url, headers, payload, is_streaming)
+                response_data, error_detail = await make_v2_request(target_url, headers, payload, is_streaming)
                 
                 if response_data and error_detail is None:
                     logging.info(f"Success with sub-provider '{sub_provider}' via '{provider_name}'")
@@ -476,7 +476,7 @@ async def chat_completions_v2(request: Request):
                 payload["model"] = model_to_try # Override model for this attempt
                 
                 # Make the request for this specific model
-                response_data, error_detail = await make_request(target_url, headers, payload, is_streaming)
+                response_data, error_detail = await make_v2_request(target_url, headers, payload, is_streaming)
 
                 if response_data and error_detail is None:
                     logging.info(f"Success with model '{model_to_try}' via '{provider_name}'")
@@ -502,7 +502,7 @@ async def chat_completions_v2(request: Request):
             payload["model"] = target_model # Override model if needed
 
             # Make the request
-            response_data, error_detail = await make_request(target_url, headers, payload, is_streaming)
+            response_data, error_detail = await make_v2_request(target_url, headers, payload, is_streaming)
 
             if response_data and error_detail is None:
                 logging.info(f"Success with standard provider '{provider_name}'")
