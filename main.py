@@ -206,32 +206,59 @@ async def make_request(target_url: str, headers: dict, payload: dict, is_streami
 
                     # Stream the response
                     async for chunk in response.aiter_bytes():
-                        if first_chunk:
-                            first_chunk = False
-                            # Check first chunk for error messages (common pattern)
-                            try:
-                                chunk_str = chunk.decode('utf-8')
+                        chunk_str = None
+                        try:
+                            # Decode chunk to check content
+                            chunk_str = chunk.decode('utf-8')
+
+                            # ---- MODIFICATION START ----
+                            # Check if this chunk should be ignored for 'first chunk' error check
+                            if chunk_str.startswith(": OPENROUTER PROCESSING"):
+                                logging.debug(f"Ignoring chunk for first_chunk check: {chunk_str[:100]}...")
+                                # Yield the chunk but skip the first_chunk logic below
+                                if chunk:
+                                    # print(f"Yielding ignored chunk from {target_url}: {chunk[:200]}...") # Optional: less verbose logging
+                                    yield chunk
+                                continue # Process next chunk
+                            # ---- MODIFICATION END ----
+
+                            # If it's not an ignored chunk AND we are still looking for the first *real* chunk
+                            if first_chunk:
+                                first_chunk = False # Mark that we've found the first *real* chunk
+                                logging.debug(f"Processing first *real* chunk from {target_url}: {chunk_str[:100]}...")
+                                # Check this first *real* chunk for error messages
                                 if '"error"' in chunk_str or '"detail"' in chunk_str:
-                                     # Attempt to parse as JSON to get detail
                                      try:
+                                         # Attempt to parse as JSON to get detail
                                          error_json = json.loads(chunk_str.replace("data: ", "").strip())
                                          error_detail = error_json.get("error", {}).get("message") or error_json.get("detail")
-                                     except:
+                                     except Exception as json_e: # Catch specific JSON errors
+                                         logging.warning(f"Failed to parse potential error JSON in first chunk: {json_e}. Falling back to raw chunk.")
                                          error_detail = chunk_str # Fallback to raw chunk
-                                     logging.warning(f"Error detected in first stream chunk from {target_url}: {error_detail}")
+                                     logging.warning(f"Error detected in first *real* stream chunk from {target_url}: {error_detail}")
                                      error_in_stream = True
-                                     # Do not yield the error chunk, stop the generator
-                                     return
-                            except UnicodeDecodeError:
-                                pass # Ignore if chunk is not valid UTF-8
-                        
-                        # Only yield non-empty chunks
-                        if chunk: 
+                                     return # Stop the generator, do not yield the error chunk
+
+                        except UnicodeDecodeError:
+                            # If chunk is not UTF-8, we can't check its content.
+                            # If we were still looking for the first chunk, we can't check this one.
+                            # We'll proceed, but log it. The first *decodable* non-ignored chunk will be checked.
+                            logging.warning(f"Could not decode chunk from {target_url} as UTF-8. Skipping content check for this chunk.")
+                            if first_chunk:
+                                # We can't check this as the first chunk, but we need to eventually set first_chunk to False.
+                                # Let's assume it's not an error chunk and proceed.
+                                # The *next* decodable, non-ignored chunk will become the 'first_chunk' to check.
+                                # Alternatively, we could set first_chunk = False here, meaning we miss checking this undecodable one.
+                                # Let's stick to checking the first *decodable* non-ignored chunk.
+                                pass # Keep first_chunk = True until a decodable, non-ignored chunk arrives
+
+                        # Yield the current chunk if it's not empty (and wasn't an error chunk that caused a return)
+                        if chunk:
+                            # print(f"Yielding chunk from {target_url}: {chunk[:200]}...") # Optional: less verbose logging
                             yield chunk
-                        else:
-                            # Optionally log that an empty chunk was received and skipped
-                            print(f"Skipping empty chunk received from {target_url}")
-                            pass
+                        # else: # No need to log empty chunks unless debugging
+                            # print(f"Skipping empty chunk received from {target_url}")
+                            # pass
 
 
             # Check for error *before* returning the StreamingResponse
@@ -252,18 +279,33 @@ async def make_request(target_url: str, headers: dict, payload: dict, is_streami
 
             # If no immediate error, return the (potentially primed) generator
             async def combined_generator():
+                nonlocal error_in_stream
                 # Yield the first chunk if it was successfully retrieved
                 if not first_chunk and not error_in_stream: # first_chunk is False if priming succeeded
+                    print(f"Yielding first chunk from {target_url}: {first_yield[:200]}...")  
                     yield first_yield
                 # Yield the rest
                 async for chunk in gen:
+                    print(f"Yielding chunk from {target_url}: {chunk[:200]}...")  
+                    chunk_str = chunk.decode('utf-8')
+                    if chunk_str.startswith("data:") and '"code":' in chunk_str :
+                            # Attempt to parse as JSON to get detail
+                            try:
+                                error_json = json.loads(chunk_str.replace("data: ", "").strip())
+                                error_detail = error_json.get("error", {}).get("message") or error_json.get("detail")
+                            except:
+                                error_detail = chunk_str # Fallback to raw chunk
+                            logging.warning(f"Error detected in stream chunk from {target_url}: {error_detail}")
+                            error_in_stream = True
+                            error_detail = chunk_str
+
                     yield chunk
 
             return StreamingResponse(
                 combined_generator(),
                 media_type="text/event-stream",
                 headers={"Transfer-Encoding": "chunked", "X-Accel-Buffering": "no"}
-            ), None
+            ), error_detail
         else:
             # Non-streaming request
             response = await client.post(target_url, headers=headers, json=payload, timeout=None)
@@ -403,12 +445,10 @@ async def chat_completions_v2(request: Request):
                 payload["provider"] = {"order": [sub_provider]} # Assuming it goes in the body based on old v1 logic
                 payload["allow_fallbacks"] = False
 
-                print("Payload for sub-provider: ", payload) # Debugging line
-
                 # Make the request for this specific sub-provider
                 response_data, error_detail = await make_request(target_url, headers, payload, is_streaming)
                 
-                if response_data:
+                if response_data and error_detail is None:
                     logging.info(f"Success with sub-provider '{sub_provider}' via '{provider_name}'")
                     return response_data # Success! Return the response.
                 else:
@@ -438,15 +478,15 @@ async def chat_completions_v2(request: Request):
                 # Make the request for this specific model
                 response_data, error_detail = await make_request(target_url, headers, payload, is_streaming)
 
-                if response_data:
+                if response_data and error_detail is None:
                     logging.info(f"Success with model '{model_to_try}' via '{provider_name}'")
                     return response_data # Success! Return the response.
                 else:
+                    payload["messages"] = "<REMOVED>" # Remove messages from payload for logging
                     logging.warning(f"Failed attempt with model '{model_to_try}' via '{provider_name}'.\r\n" \
                                     f"Error: {error_detail}\r\n" \
                                     f"Target Url: {target_url}\r\n" \
-                                    f"Payload: {payload}")
-                    
+                                    f"Payload: {payload}")                     
                     last_error_detail = f"Model '{model_to_try}' via '{provider_name}' failed: {error_detail}"
                     # Continue to the next model in the inner loop
             
@@ -464,10 +504,11 @@ async def chat_completions_v2(request: Request):
             # Make the request
             response_data, error_detail = await make_request(target_url, headers, payload, is_streaming)
 
-            if response_data:
+            if response_data and error_detail is None:
                 logging.info(f"Success with standard provider '{provider_name}'")
                 return response_data # Success! Return the response.
             else:
+                payload["messages"] = "<REMOVED>" # Remove messages from payload for logging
                 logging.warning(f"Failed attempt with model '{target_model}' via '{provider_name}'.\r\n" \
                                 f"Error: {error_detail}\r\n" \
                                 f"Target Url: {target_url}\r\n" \
