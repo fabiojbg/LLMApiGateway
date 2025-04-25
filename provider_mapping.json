@@ -48,6 +48,46 @@
     "models":
     [
         {
+            "model": "llmgateway/free-stack",
+            "providers" :
+            [
+                {
+                    "openrouter":
+                    {
+                        "modelname" : "google/gemini-2.5-pro-exp-03-25:free",
+                        "providers_order" : ["Google AI Studio"]
+                    }
+                },
+                {
+                    "requesty":
+                    {
+                        "models" : ["google/gemini-2.5-pro-exp-03-25"]
+                    }
+                },
+                {
+                    "openrouter":
+                    {
+                        "modelname" : "deepseek/deepseek-chat-v3-0324:free",
+                        "providers_order" : ["Chutes", "Targon"]
+                    }
+                },
+                {
+                    "openrouter":
+                    {
+                        "modelname" : "deepseek/deepseek-r1-zero:free",
+                        "providers_order" : ["Chutes", "Targon"]
+                    }
+                },
+                {
+                    "openrouter":
+                    {
+                        "modelname" : "deepseek/deepseek-r1:free",
+                        "providers_order" : ["Chutes", "Targon"]
+                    }
+                }
+            ]                    
+        },
+        {
             "model": "deepseek/deepseek-chat-v3-0324:free",
             "providers" :
             [
@@ -105,16 +145,16 @@
             "providers" :
             [
                 {
-                "openrouter":
-                {
-                    "modelname" : "google/gemini-2.5-pro-exp-03-25:free",
-                    "providers_order" : ["Google AI Studio", "Google"]
-                }
+                    "openrouter":
+                    {
+                        "modelname" : "google/gemini-2.5-pro-exp-03-25:free",
+                        "providers_order" : ["Google AI Studio"]
+                    }
                 },
                 {
                     "requesty":
                     {
-                        "modelname" : "gemini-2.5-pro-exp-03-25"           
+                        "modelname" : "google/gemini-2.5-pro-exp-03-25"           
                     }
                 }
             ]                    
