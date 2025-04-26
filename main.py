@@ -85,6 +85,7 @@ app.add_middleware(
 client = httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=60.0)) 
 
 @app.get("/v1/models")
+@app.get("/v2/models")
 async def get_models():
     try:
         headers = {
