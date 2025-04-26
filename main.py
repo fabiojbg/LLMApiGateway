@@ -190,6 +190,9 @@ async def make_v2_request(target_url: str, headers: dict, payload: dict, is_stre
     error_in_stream = False
     error_detail = None
 
+    payload_to_log = copy.deepcopy(payload)
+    payload_to_log["messages"] = "<REMOVED>" # Remove messages from payload for logging
+    logging.debug(f"make_v2_request(): Sending request for model \'{payload_to_log['model']}\'. Payload: {payload_to_log}") # Log the payload without messages
     try:
         if is_streaming:
             async def stream_generator():
@@ -215,8 +218,8 @@ async def make_v2_request(target_url: str, headers: dict, payload: dict, is_stre
                             if chunk_str.startswith(": OPENROUTER PROCESSING"): # treat OpenRouter initial and not usefull chunks as ignored
                                 logging.debug(f"Ignoring chunk for first_chunk check: {chunk_str[:100]}...")
                                 # Yield the chunk but skip the first_chunk logic below
-                                if chunk:
-                                    yield chunk
+                                #if chunk:
+                                #    yield chunk
                                 continue # Process next chunk
 
                             # If it's not an ignored chunk AND we are still looking for the first *real* chunk
@@ -347,7 +350,7 @@ async def chat_completions_v2(request: Request):
         
         payload_to_log = copy.deepcopy(request_body_json)
         payload_to_log["messages"] = "<REMOVED>" # Remove messages from payload for logging
-        logging.debug(f"Received v2 request for model \'{payload_to_log['model']}\'. Payload: {payload_to_log}") # Log the payload without messages
+        logging.debug(f"/v2/chat/completions: Request for model \'{payload_to_log['model']}\'. Payload: {payload_to_log}") # Log the payload without messages
     except json.JSONDecodeError:
         logging.error("Failed to decode request body JSON", exc_info=True)
         raise HTTPException(status_code=400, detail="Invalid JSON body")
@@ -360,8 +363,6 @@ async def chat_completions_v2(request: Request):
 
     if not requested_model:
         raise HTTPException(status_code=400, detail="Missing 'model' in request body")
-
-    logging.info(f"Received v2 request for model: {requested_model}, streaming: {is_streaming}")
 
     # 1. Find Routing Rule or Use Fallback
     provider_sequence = models_config.get(requested_model)
@@ -386,7 +387,7 @@ async def chat_completions_v2(request: Request):
 
     # 2. Iterate Through Providers and Attempt Requests
     last_error_detail = "No providers were attempted."
-    for provider_rule in provider_sequence:
+    for i, provider_rule in enumerate(provider_sequence): # Added enumerate for logging index
         provider_name = list(provider_rule.keys())[0]
         provider_rule_details = provider_rule[provider_name] # Contains modelname, providers_order, or models
 
@@ -436,7 +437,7 @@ async def chat_completions_v2(request: Request):
                  continue
 
             for sub_provider in sub_providers:
-                logging.info(f"Attempting sub-provider: {sub_provider} via {provider_name}")
+                logging.info(f"Attempting sub-provider: {sub_provider} via {provider_name} for {target_model}")
                 payload = copy.deepcopy(request_body_json)
                 payload["model"] = target_model # Override model
                 
@@ -449,7 +450,7 @@ async def chat_completions_v2(request: Request):
                 response_data, error_detail = await make_v2_request(target_url, headers, payload, is_streaming)
                 
                 if response_data and error_detail is None:
-                    logging.info(f"Success with sub-provider '{sub_provider}' via '{provider_name}'")
+                    logging.info(f"Connection success with provider '{provider_name}' via '{sub_provider}' for model '{target_model}'. Starting streaming response...")
                     return response_data # Success! Return the response.
                 else:
                     logging.warning(f"Failed attempt with sub-provider '{sub_provider}' via '{provider_name}'. Error: {error_detail}")
@@ -458,7 +459,7 @@ async def chat_completions_v2(request: Request):
 
             # If all sub-providers failed, continue to the next main provider in the outer loop
             logging.warning(f"All sub-providers for '{provider_name}' failed.")
-            continue 
+            continue
 
         # Case 2: Provider with multiple models list (e.g., Requesty)
         elif is_multiple_models and "models" in provider_rule_details:
@@ -479,19 +480,21 @@ async def chat_completions_v2(request: Request):
                 response_data, error_detail = await make_v2_request(target_url, headers, payload, is_streaming)
 
                 if response_data and error_detail is None:
-                    logging.info(f"Success with model '{model_to_try}' via '{provider_name}'")
+                    logging.info(f"Connection success with provider '{provider_name}' for model '{model_to_try}'. Starting streaming response...")
                     return response_data # Success! Return the response.
                 else:
                     payload["messages"] = "<REMOVED>" # Remove messages from payload for logging
                     logging.warning(f"Failed attempt with model '{model_to_try}' via '{provider_name}'.\r\n" \
                                     f"Error: {error_detail}\r\n" \
                                     f"Target Url: {target_url}\r\n" \
-                                    f"Payload: {payload}")                     
+                                    f"Payload: {payload}")
                     last_error_detail = f"Model '{model_to_try}' via '{provider_name}' failed: {error_detail}"
+                    logging.debug(f"Continuing to next model after failure with '{model_to_try}' via '{provider_name}'.") # Added log
                     # Continue to the next model in the inner loop
             
             # If all models failed, continue to the next main provider in the outer loop
             logging.warning(f"All models for '{provider_name}' failed.")
+            logging.debug(f"Continuing to next main provider after all models failed for '{provider_name}'.") # Added log
             continue
 
         # Case 3: Standard Provider (or fallback)
@@ -505,7 +508,7 @@ async def chat_completions_v2(request: Request):
             response_data, error_detail = await make_v2_request(target_url, headers, payload, is_streaming)
 
             if response_data and error_detail is None:
-                logging.info(f"Success with standard provider '{provider_name}'")
+                logging.info(f"Connection success with provider '{provider_name}' for model '{target_model}'. Starting streaming response...")
                 return response_data # Success! Return the response.
             else:
                 payload["messages"] = "<REMOVED>" # Remove messages from payload for logging
@@ -514,6 +517,7 @@ async def chat_completions_v2(request: Request):
                                 f"Target Url: {target_url}\r\n" \
                                 f"Payload: {payload}")
                 last_error_detail = f"Provider '{provider_name}' failed: {error_detail}"
+                logging.debug(f"Continuing to next main provider after standard attempt failed for '{provider_name}'.") # Added log
                 # Continue to the next provider in the outer loop
                 continue
 

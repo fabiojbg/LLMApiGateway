@@ -40,7 +40,7 @@ def configure_logging():
             'file': {
                 'class': 'logging.handlers.RotatingFileHandler',
                 'filename': 'logs/gateway.log',
-                'maxBytes': 1048576,
+                'maxBytes': 256000,
                 'backupCount': 5,
                 'formatter': 'json'
             }
@@ -48,6 +48,13 @@ def configure_logging():
         'root': {
             'handlers': ['console', 'file'],
             'level': 'DEBUG'
+        },
+        'loggers': {
+            'httpcore': {
+                'level': 'WARNING',
+                'handlers': ['console', 'file'],
+                'propagate': False
+            }
         }
     })
 
