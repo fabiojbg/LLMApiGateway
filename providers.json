@@ -1,0 +1,45 @@
+[
+    {
+        "openrouter":
+        {
+            "baseUrl" : "https://openrouter.ai/api/v1",            
+            "apikey" : "APIKEY_OPENROUTER"
+        }
+    },
+    {
+        "requesty":
+        {
+            "baseUrl" : "https://router.requesty.ai/v1",            
+            "apikey" : "APIKEY_REQUESTY",
+            "multiple_models" : "true" 
+        }
+    },
+    {
+        "nebius":
+        {
+            "baseUrl" : "https://api.studio.nebius.ai/v1",            
+            "apikey" : "APIKEY_NEBIUS"
+        }
+    },
+    {
+        "openai":
+        {
+            "baseUrl" : "https://api.openai.com/v1",            
+            "apikey" : "APIKEY_OPENAI"
+        }
+    },
+    {
+        "together":
+        {
+            "baseUrl" : "https://api.together.xyz/v1",            
+            "apikey" : "APIKEY_TOGETHER"
+        }
+    },
+    {
+        "klusterai":
+        {
+            "baseUrl" : "https://api.kluster.ai/v1",            
+            "apikey" : "APIKEY_KLUSTERAI"
+        }
+    }
+]

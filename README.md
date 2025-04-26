@@ -1,164 +1,177 @@
+# Fault-Tolerant LLM Gateway
+---
+<div align="center" style="text-align: center;">
+ <img alt="AI Text Corrector" src="https://img.shields.io/badge/LLM-Gateway-blue?style=flat" />&nbsp;
+ <a href="https://www.paypal.com/donate/?business=G47L9N4UW8C2C&no_recurring=1&item_name=Thank+you+%21%21%21&currency_code=USD"><img alt="Download" src="https://img.shields.io/badge/Donate-😊-yellow?style=flat" /></a>
+</div>
+<br>
 
-# LLM Gateway for OpenRouter with Provider Order Injection
-
-A FastAPI-based proxy for OpenAI-compatible API servers with advanced logging, authentication, and provider mapping. Designed for use with **OpenRouter**, this gateway lets you inject preferred provider orders per model via **openrouter_provider_mapping.json**, enabling OpenRouter to use your specified provider priorities. This resolves the lack of this functionality in OpenRouter, Cline, and RooCode.  [See Provider Mapping section](#provider-mappping).
-The gateway also allows logging all chat requests to the /logs folder to help inspect the messages and the workings of the agents and the models. 
-
+Don't experience failures from API calls to your LLM models anymore, no matter which provider you're using.  
+This project can replace providers to give you a nearly infallible LLM model provider.  
+LLM Gateway works as an OpenAI-compatible LLM API provider with advanced fallback support for models in case of response failures.  
+Use it with code agents like Cline, RooCode, or even with your apps as a regular LLM provider compatible with the OpenAI API.  
 ## Features
 
-- OpenAI-compatible API endpoints
-  - `/v1/models` - List available models
-  - `/v1/chat/completions` - Chat completions (**supports streaming**)
-- API key authentication middleware
-- Three-layer logging system:
-  - Request/response logging (JSON format)
-  - Detailed chat completion logging (text files)
-  - Error logging
-- Provider model mapping (OpenRouter compatible)
-- Health check endpoint (`/health`)
-- CORS enabled by default
-- Configurable log rotation
+## Gateway endpoints
 
-## Install Dependencies
-
-Install Python dependencies:
-```bash
-pip install -r requirements.txt
-```
-
+  - `/v1/models` - Like v1, just lists available models <br/><br/>
+  - `/v1/chat/completions` - OpenAI compatible API that routes calls to other providers with fallback in case of call failure.
+  **HOT FEATURE:** This endpoint allows you to create a sequence of fallback models to be called in case of failure, i.e., if a model response fails, it automatically calls the next in the fallback sequence and so on. The model's sequence can consist of different models and different providers. For example, the first model in the sequence is deepseek-chat from OpenRouter; we can configure the gateway to fall back to gpt-4o in OpenAI in case of failure. This fallback sequence can be of any size and must be configured in the file **models_fallback_rules.json**.
 
 ## Configuration
 
-Create `.env` file from example:
+Create a `.env` file from the example .env.example:
 ```bash
 cp .env.example .env
 ```
- **.env** configuration example for OpenRouter:
+ **.env** configuration example:
  ```bash
-# Target OpenAI-compatible server URL
-TARGET_SERVER_URL=https://openrouter.ai/api/v1
-
-# API key for the target server
-TARGET_API_KEY=<Your OpenRouterKey>
-
-# Fixed API key that clients must use to access this gateway
-# Use it in the Authorization: Bearer <ThisGatewayApiKey>)
+# This gateway must have its own API key that clients must use to access it
+# Use it in http header as "Authorization: Bearer <ThisGatewayApiKey>"
 GATEWAY_API_KEY=<ThisGatewayApiKey>
 
 # Maximum number of log files to keep (older files will be deleted)
-LOG_FILE_LIMIT=10
+LOG_FILE_LIMIT=15
 
-# Enable/Disable automatic model provider order injection (true/false).
-PROVIDER_INJECTION_ENABLED=true
-
-#Enable/disable logging of chat messages to the /logs folder (true/false)
+# Enable/disable logging of chat messages to the /logs folder (true/false). 
+# Useful for debugging
 LOG_CHAT_ENABLED=false
+
+# The default fallback provider to use when the model received is not recognized 
+# by this gateway in the fallback rules.
+FALLBACK_PROVIDER=openrouter
+
+# The keys of your providers. Used in the providers
+# Fill the ones you want to use or add more if you like
+APIKEY_OPENROUTER=<your_openrouter_api_key>
+APIKEY_REQUESTY=<your_requesty_api_key>
+APIKEY_OPENAI=<your_openai_api_key>
+APIKEY_NEBIUS=<your_nebius_api_key>
+APIKEY_TOGETHER=<your_together_api_key>
+APIKEY_KLUSTERAI=<your_klusterai_api_key>
 ```
 
 ### Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `TARGET_SERVER_URL` | URL of target OpenAI-compatible server | *required* |
-| `TARGET_API_KEY` | API key for target server | *required* |
-| `GATEWAY_API_KEY` | Fixed API key clients must use | *required* |
-| `LOG_FILE_LIMIT` | Max number of chat log files to keep | `15` |
-| `PROVIDER_INJECTION_ENABLED` | Enable provider model mapping | `true` |
+| `GATEWAY_API_KEY` | Fixed API key clients must use to access this gateway | *required* |
+| `LOG_FILE_LIMIT` | Maximum number of chat log files to keep | `15` |
+| `LOG_CHAT_ENABLED` | Enable detailed chat logging to `logs/` directory | `true` |
+| `FALLBACK_PROVIDER` | Default provider name for `/v2` if no rule matches | `openrouter` |
+| `APIKEY_PROVIDERNAME` | API key for a specific provider (e.g., `APIKEY_OPENROUTER`) | *required for providers in providers.json* |
 
-### Provider Mapping
+### Provider Mapping (`provider_mapping.json`)
 
-This configuration defines which provider's ordering should be injected into the request according to the model being used.
+This JSON file defines the available backend LLM providers and the routing rules for the `/v2/chat/completions` endpoint. It allows for complex routing strategies, including failover and provider-specific configurations.
 
-Configure model mappings in `openrouter_provider_mapping.json`:
+**Structure:**
+
+-   **`providers`**: An array of objects, where each object defines a backend provider.
+    -   Key: The internal name used to refer to this provider (e.g., "openrouter", "requesty").
+    -   Value: An object containing:
+        -   `baseUrl`: The base URL for the provider's API.
+        -   `apikey`: The **name** of the environment variable holding the API key for this provider (e.g., "APIKEY_OPENROUTER"). The actual key is read from the environment.
+        -   `multiple_models` (optional, boolean): Set to `true` for providers (like Requesty) that allow specifying a list of models to try in sequence within a single rule.
+-   **`models`**: An array of objects, defining routing rules for specific model names requested by the client.
+    -   `model`: The model name the client will request (e.g., "llmgateway/free-stack", "deepseek/deepseek-chat-v3-0324").
+    -   `providers`: An array defining the sequence of providers to try for this model. Each element in this array is an object:
+        -   Key: The internal name of the provider (must match a key in the main `providers` list).
+        -   Value: An object containing provider-specific instructions:
+            -   `modelname` (optional): The actual model name to request from this specific backend provider. If omitted, the client's requested `model` name is used.
+            -   `providers_order` (optional, for providers like OpenRouter): A list of sub-provider names to try *within* this backend provider, in the specified order. The gateway will make separate requests for each sub-provider.
+            -   `models` (optional, used when `multiple_models` is true for the provider): A list of actual model names to try sequentially *on this specific provider*. The gateway will make separate requests for each model in this list.
+
+**Example (`models_fallback_rules.json`):**
+
 ```json
 [
     {
-        "model": "deepseek/deepseek-chat-v3-0324",
-        "providers": ["DeepInfra", "Parasail", "Hyperbolic"]
+        // an example of only free models which we'll call "llmgateway/free-stack"
+        "gateway_model_name": "llmgateway/free-stack",
+        "fallback_models" :
+        [
+            {
+                "provider": "openrouter",
+                "model" : "google/gemini-2.5-pro-exp-03-25",
+                "providers_order" : ["Google AI Studio"]
+            },
+            {
+                "provider": "requesty",
+                "model" : "google/gemini-2.5-pro-exp-03-25"
+            },
+            {
+                "provider": "openrouter",
+                "model" : "deepseek/deepseek-chat-v3-0324:free",
+                "providers_order" : ["Chutes", "Targon"]
+            }
+        ]                    
     },
     {
-        "model": "deepseek/deepseek-chat-v3-0324:free",
-        "providers": ["Chutes", "Targon"]
+        // an example of a model that exists in various providers
+        "gateway_model_name": "llmgateway/deepseek-v3.1", 
+        "fallback_models" :
+        [
+            {
+                "provider": "openrouter",
+                "model" : "deepseek/deepseek-chat-v3-0324",
+                "providers_order" : ["Lambda", "DeepInfra", "Nebius AI Studio"]
+            },
+            {
+                "provider": "nebius",
+                "model": "deepseek-ai/DeepSeek-V3-0324"
+            },
+            {
+                "provider": "together",
+                "model" : "deepseek-ai/DeepSeek-V3"
+            },
+            {
+                "provider": "requesty",
+                "model" : "novita/deepseek/deepseek-v3-0324"
+            },
+            {
+                "provider": "requesty",
+                "model" : "novita/deepseek/deepseek-v3-turbo"
+            }
+        ]                    
     }
-]
+]    
 ```
+
+**Failover Logic:**
+
+When a request comes to `/v1/chat/completions`:
+
+1.  The gateway finds the rule matching the requested `model` in the models_fallback_rules.json
+2.  If the model is not found in the rules, route the request to the fallback provider defined by the FALLBACK_PROVIDER environment variable. The name of the model is the same as received.
+3.  If it finds the model, call the model defined in the first rule to its corresponding provider.
+4.  If the first call fails, try the next ones until some succeed
+5.  Return error HTTP 503 if none of the called models succeed.
 
 ## Running
 
-### Development
+## With pip
+
+Install Python dependencies once if you're using pip:
 ```bash
-uvicorn main:app --reload --port 9000
+pip install -r requirements.txt
+```
+and run
+```bash
+python llmgateway.py
 ```
 
-### Production
+
+### With UV (preferable)
+if uv is installed, simply do:
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 9000
+uv run llmgateway.py
 ```
 
-## Cline configuration Example
+
+## Using with Cline Example
+You can use it with Cline, RooCode, or any other code agent.
+You just need to configure it as an OpenAI-compatible provider.
+Here is an example of using this gateway with Cline, set to use the model `'llmgateway/free-stack'`, which only uses models free of charge, as configured in the example above.
 
 ![Cline example](./images/cline-example.png)
-
-## API Usage
-
-### Authentication
-Include the gateway API key in the Authorization header:
-```
-Authorization: Bearer {GATEWAY_API_KEY}
-```
-
-### Endpoints
-
-#### GET /v1/models
-Lists available models from the target server.
-
-#### POST /v1/chat/completions
-- Supports both streaming and non-streaming responses
-- When `PROVIDER_INJECTION_ENABLED=true`, injects provider information based on model mapping
-- Set `"stream": true` in request body for streaming responses
-
-## Logging
-
-### Structured Logs
-- Location: `logs/gateway.log`
-- JSON format
-- Includes:
-  - Request metadata
-  - Response status codes
-  - Processing time
-  - Errors
-
-### Chat Completions Logs
-- Location: `logs/` directory
-- Text format with timestamps
-- Includes:
-  - Request headers
-  - Full request body
-  - LLM response content
-- Automatically rotated (oldest files deleted when over limit)
-
-## Middleware
-
-1. **Authentication**:
-   - Validates API key
-   - Skips auth for `/health` endpoint
-
-2. **Request Logging**:
-   - Tracks request duration
-   - Logs request metadata
-   - Handles streaming responses
-
-3. **Chat Logging**:
-   - Detailed logging of chat completions
-   - Handles both streaming and non-streaming
-   - Creates timestamped log files
-
-## Dependencies
-
-- fastapi==0.109.0
-- uvicorn==0.27.0
-- httpx==0.27.0
-- python-dotenv==1.0.0
-- python-json-logger==2.0.7
-- pydantic==2.6.1
-- pydantic-settings==2.2.1
