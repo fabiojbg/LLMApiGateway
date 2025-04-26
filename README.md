@@ -61,28 +61,8 @@ APIKEY_KLUSTERAI=<your_klusterai_api_key>
 | `FALLBACK_PROVIDER` | Default provider name for `/v2` if no rule matches | `openrouter` |
 | `APIKEY_PROVIDERNAME` | API key for a specific provider (e.g., `APIKEY_OPENROUTER`) | *required for providers in providers.json* |
 
-### Provider Mapping (`provider_mapping.json`)
 
-This JSON file defines the available backend LLM providers and the routing rules for the `/v2/chat/completions` endpoint. It allows for complex routing strategies, including failover and provider-specific configurations.
-
-**Structure:**
-
--   **`providers`**: An array of objects, where each object defines a backend provider.
-    -   Key: The internal name used to refer to this provider (e.g., "openrouter", "requesty").
-    -   Value: An object containing:
-        -   `baseUrl`: The base URL for the provider's API.
-        -   `apikey`: The **name** of the environment variable holding the API key for this provider (e.g., "APIKEY_OPENROUTER"). The actual key is read from the environment.
-        -   `multiple_models` (optional, boolean): Set to `true` for providers (like Requesty) that allow specifying a list of models to try in sequence within a single rule.
--   **`models`**: An array of objects, defining routing rules for specific model names requested by the client.
-    -   `model`: The model name the client will request (e.g., "llmgateway/free-stack", "deepseek/deepseek-chat-v3-0324").
-    -   `providers`: An array defining the sequence of providers to try for this model. Each element in this array is an object:
-        -   Key: The internal name of the provider (must match a key in the main `providers` list).
-        -   Value: An object containing provider-specific instructions:
-            -   `modelname` (optional): The actual model name to request from this specific backend provider. If omitted, the client's requested `model` name is used.
-            -   `providers_order` (optional, for providers like OpenRouter): A list of sub-provider names to try *within* this backend provider, in the specified order. The gateway will make separate requests for each sub-provider.
-            -   `models` (optional, used when `multiple_models` is true for the provider): A list of actual model names to try sequentially *on this specific provider*. The gateway will make separate requests for each model in this list.
-
-**Example (`models_fallback_rules.json`):**
+### Fallback Rules JSON Example (`models_fallback_rules.json`):
 
 ```json
 [
