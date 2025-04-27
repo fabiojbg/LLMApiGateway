@@ -21,6 +21,7 @@ import sys
 import asyncio # Added for potential delays/retries if needed later
 import copy # Added for deep copying request body
 from db.model_rotation import ModelRotationDB
+from config_loader import FallbackModelRule, ProviderDetails # Import corrected for type hints
 
 # Initialize logging
 configure_logging() # Ensure logging is configured before first use
@@ -28,108 +29,11 @@ configure_logging() # Ensure logging is configured before first use
 # Initialize model rotation database
 model_rotation_db = ModelRotationDB()
 
-# Load models fallback rules from JSON file
-providers_config = {}
-fallback_rules = {}
-
-providers_filename = "providers.json"
-fallback_rules_filename = "models_fallback_rules.json"
-providers_mapping_path = Path(__file__).parent / providers_filename
-models_fallback_rules_path = Path(__file__).parent / fallback_rules_filename
-
-try:
-    if providers_mapping_path.exists():
-        with open(providers_mapping_path) as f:
-            full_mapping = json.load(f)
-            # Normalize provider config into a dictionary for easy lookup
-            providers_config = {
-                list(p.keys())[0]: list(p.values())[0] 
-                for p in full_mapping
-            }
-            # **** validate data ****
-
-            # verify if the fallback provider is defined and is configured in the provider mapping
-            fallback_provider_name = settings.fallback_provider
-            if fallback_provider_name not in providers_config:
-                logging.error(f"Fallback provider '{fallback_provider_name}' not found in providers configuration.")
-                sys.exit(1)
-
-            # check providers_config for baseUrl and apikey
-            for provider_name in providers_config:
-                provider_config = providers_config[provider_name]
-                if not provider_config.get("baseUrl"):
-                    logging.error(f"Provider '{provider_name}' is missing 'baseUrl' in configuration.")
-                    sys.exit(1)
-                provider_apy_key = provider_config.get("apikey")
-                if not provider_apy_key:
-                    logging.error(f"Provider '{provider_name}' is missing 'apikey' in configuration.")
-                    sys.exit(1)
-                env_api_key = os.getenv(provider_apy_key)
-                if not env_api_key:
-                    logging.warning(f"Environment variable '{provider_apy_key}' for provider '{provider_name}' must be set in enviroment.")
-                    sys.exit(1)
-except Exception as e:
-    logging.error(f"Failed to load or parse '{fallback_rules_filename}': {str(e)}", exc_info=True)
-    sys.exit(1)  # Exit if critical error occurs
-
-try:
-    if models_fallback_rules_path.exists():
-        with open(models_fallback_rules_path) as f:
-            full_mapping = json.load(f)
-
-            # Normalize model routing rules into a dictionary
-            fallback_rules = {}
-            for m in full_mapping:
-                gateway_model_name = m["gateway_model_name"]
-                fallback_models = m["fallback_models"]
-                rotate_models = m.get("rotate_models", False)
-                
-                # Convert string "true"/"false" to boolean if needed
-                if isinstance(rotate_models, str):
-                    rotate_models = rotate_models.lower() == "true"
-                
-                fallback_rules[gateway_model_name] = {
-                    "fallback_models": fallback_models,
-                    "rotate_models": rotate_models
-                }
-
-            # **** validate all data in json ****
-            # verify if the providers defined for the fallback models are valid
-            for gateway_model_name in fallback_rules:
-                model_config = fallback_rules[gateway_model_name]
-                fallback_models = model_config["fallback_models"]
-                if fallback_models is None:
-                    logging.error(f"Gateway model '{gateway_model_name}' must have at least one fallback model defined.")
-                    sys.exit(1)
-                if not isinstance(fallback_models, list):
-                    logging.error(f"Fallback models for '{gateway_model_name}' must be a list.")
-                    sys.exit(1)
-                for fallback_model in fallback_models:
-                    fallback_model_provider = fallback_model["provider"] if 'provider' in fallback_model else None
-                    fallback_model_name = fallback_model["model"] if 'model' in fallback_model else None
-                    if not fallback_model_provider:
-                        logging.error(f"Provider is missing for '{gateway_model_name}' and fallback model '{fallback_model_name}'. ")
-                        sys.exit(1)
-                    if not fallback_model_name:
-                        logging.error(f"Model name is missing for '{gateway_model_name}' and fallback model '{fallback_model_provider}'. ")
-                        sys.exit(1)
-                    if fallback_model_provider not in providers_config:
-                        logging.error(f"Invalid provider '{fallback_model_provider}' for '{gateway_model_name}' and fallback model '{fallback_model_name}'. ")
-                        sys.exit(1)
-                    if not fallback_model_name:
-                        logging.error(f"Model name is missing for '{gateway_model_name}' and provider '{fallback_model_provider}'. ")
-                        sys.exit(1)
-                
-            logging.info(f"Successfully loaded model's fallback rules from {models_fallback_rules_path}")
-            # Log loaded provider names for verification
-            logging.info(f"Loaded providers: {list(providers_config.keys())}")
-            # Log loaded model rule keys for verification
-            logging.info(f"Loaded model rules for: {list(fallback_rules.keys())}")
-    else:
-        logging.warning(f"Provider mapping file not found at {models_fallback_rules_path}")
-except Exception as e:
-    logging.error(f"Failed to load or parse '{fallback_rules_filename}': {str(e)}", exc_info=True)
-    sys.exit(1)  # Exit if critical error occurs
+# Initialize configuration loader
+from config_loader import ConfigLoader
+config_loader = ConfigLoader()
+providers_config = config_loader.load_providers()
+fallback_rules = config_loader.load_fallback_rules()
     
 # Initialize FastAPI
 app = FastAPI()
@@ -163,10 +67,15 @@ async def get_models():
         
         # call fallback provider /models and append it to the response
         fallback_provider_name = settings.fallback_provider
-        fallback_provider_config = providers_config.get(fallback_provider_name)
-        fallback_provider_base_url = fallback_provider_config.get("baseUrl")
-        fallback_provider_api_key_env_var = fallback_provider_config.get("apikey")
-        fallback_provider_api_key = os.getenv(fallback_provider_api_key_env_var)
+        fallback_provider_config: Optional[ProviderDetails] = providers_config.get(fallback_provider_name)
+        if not fallback_provider_config:
+            logging.error(f"Fallback provider '{fallback_provider_name}' configuration not found.")
+            raise HTTPException(status_code=500, detail=f"Configuration error: Fallback provider '{fallback_provider_name}' not found.")
+        
+        # Correctly access attributes of the ProviderDetails object
+        fallback_provider_base_url = fallback_provider_config.baseUrl 
+        fallback_provider_api_key_env_var = fallback_provider_config.apikey
+        fallback_provider_api_key = os.getenv(fallback_provider_api_key_env_var) if fallback_provider_api_key_env_var else None
         headers = {
             "Content-Type": "application/json",
             **({"Authorization": f"Bearer {fallback_provider_api_key}"} if fallback_provider_api_key else {})
@@ -206,7 +115,7 @@ async def get_models():
 
 # --- V2 Endpoint ---
 @app.post("/v1/chat/completions")
-async def chat_completions_v2(request: Request):
+async def chat_completions(request: Request):
     try:
         request_body_bytes = await request.body()
         request_body_json = json.loads(request_body_bytes.decode('utf-8'))
@@ -228,7 +137,8 @@ async def chat_completions_v2(request: Request):
         raise HTTPException(status_code=400, detail="Missing 'model' in request body")
 
     # 1. Find Routing Rule or Use Fallback
-    model_config = fallback_rules.get(requested_model)
+    # model_config is a dictionary loaded from fallback_rules.json, not a ModelFallbackConfig object
+    model_config: Optional[Dict[str, Any]] = fallback_rules.get(requested_model) 
     if not model_config:
         logging.warning(f"No specific fallback sequence found for model '{requested_model}'. Using '{settings.fallback_provider}' fallback provider.")
 
@@ -263,18 +173,23 @@ async def chat_completions_v2(request: Request):
 
     # 2. Iterate Through Providers and Attempt Requests
     last_error_detail = "No providers were attempted."
-    for model_fallback_rule in model_fallbacks_sequence: 
+    for model_fallback_rule in model_fallbacks_sequence:
 
-        provider_name = model_fallback_rule.get("provider")
-        provider_model = model_fallback_rule.get("model")
-        subproviders_ordering = model_fallback_rule.get("providers_order") # openrouter support for subproviders ordering
+        # Access dictionary keys instead of attributes for fallback rules
+        provider_name = model_fallback_rule["provider"]
+        provider_model = model_fallback_rule["model"]
+        subproviders_ordering = model_fallback_rule.get("providers_order") # Use .get() for optional field
 
         logging.info(f"Attempting provider: {provider_name} for model '{requested_model}' and subproviders ordering: {subproviders_ordering}")
 
-        provider_config = providers_config.get(provider_name)
+        provider_config: Optional[ProviderDetails] = providers_config.get(provider_name) # Accessing the dict is correct here
+        if not provider_config:
+            logging.error(f"Configuration for provider '{provider_name}' not found. Skipping.")
+            last_error_detail = f"Configuration for provider '{provider_name}' not found."
+            continue
 
-        provider_base_url = provider_config.get("baseUrl")
-        api_key_env_var = provider_config.get("apikey")
+        provider_base_url = provider_config.baseUrl
+        api_key_env_var = provider_config.apikey
         provider_api_key = os.getenv(api_key_env_var)
 
         # Note: Some providers might not require a key or use other auth methods handled by headers
