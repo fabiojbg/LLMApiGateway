@@ -22,6 +22,8 @@ import asyncio # Added for potential delays/retries if needed later
 import copy # Added for deep copying request body
 from db.model_rotation import ModelRotationDB
 from config_loader import FallbackModelRule, ProviderDetails # Import corrected for type hints
+from infra.llm_request import LLMRequest
+from config_loader import ConfigLoader
 
 # Initialize logging
 configure_logging() # Ensure logging is configured before first use
@@ -30,7 +32,6 @@ configure_logging() # Ensure logging is configured before first use
 model_rotation_db = ModelRotationDB()
 
 # Initialize configuration loader
-from config_loader import ConfigLoader
 config_loader = ConfigLoader()
 providers_config = config_loader.load_providers()
 fallback_rules = config_loader.load_fallback_rules()
@@ -221,7 +222,7 @@ async def chat_completions(request: Request):
 
                 # Make the request for this specific sub-provider
                 
-                response_data, error_detail = await make_llm_request(target_url, headers, payload, is_streaming)
+                response_data, error_detail = await LLMRequest.execute(client, target_url, headers, payload, is_streaming)
                 #response_data = None # for debugging only
                 #error_detail = 'test error' # for debugging only
 
@@ -248,7 +249,7 @@ async def chat_completions(request: Request):
             payload["model"] = provider_model # Override model if needed
 
             # Make the request
-            response_data, error_detail = await make_llm_request(target_url, headers, payload, is_streaming)
+            response_data, error_detail = await LLMRequest.execute(client, target_url, headers, payload, is_streaming)
             #response_data = None # for debugging only
             #error_detail = 'test error' # for debugging only
 
@@ -270,163 +271,6 @@ async def chat_completions(request: Request):
     logging.error(f"All providers failed for model '{requested_model}'. Last error: {last_error_detail}")
     raise HTTPException(status_code=503, detail=f"All configured providers failed for model '{requested_model}'. Last error: {last_error_detail}")
 
-
-# --- Helper Function for making the actual request ---
-async def make_llm_request(target_url: str, headers: dict, payload: dict, is_streaming: bool):
-    """Makes the downstream request and handles streaming/non-streaming responses."""
-    first_chunk = True
-    error_in_stream = False
-    error_detail = None
-
-    payload_to_log = copy.deepcopy(payload)
-    payload_to_log["messages"] = "<REMOVED>" # Remove messages from payload for logging
-    logging.debug(f"make_llm_request(): Sending request for model \'{payload_to_log['model']}\'. Payload: {payload_to_log}") # Log the payload without messages
-    try:
-        if is_streaming:
-            async def stream_generator():
-                nonlocal first_chunk, error_in_stream, error_detail
-                async with client.stream("POST", target_url, headers=headers, json=payload, timeout=None) as response:
-                    # Check initial status code for non-2xx errors before streaming
-                    if response.status_code >= 400:
-                         error_detail = await response.aread()
-                         error_detail = error_detail.decode('utf-8')
-                         logging.error(f"Downstream error {response.status_code} from {target_url}: {error_detail}")
-                         error_in_stream = True # Mark error to prevent further processing
-                         # Do not raise here, let the outer function handle failover
-                         return # Stop the generator
-
-                    # Stream the response
-                    async for chunk in response.aiter_bytes():
-                        chunk_str = None
-                        try:
-                            # Decode chunk to check content
-                            chunk_str = chunk.decode('utf-8')
-
-                            # Check if this chunk should be ignored for 'first chunk' error check
-                            if chunk_str.startswith(": OPENROUTER PROCESSING"): # treat OpenRouter initial and not usefull chunks as ignored
-                                logging.debug(f"Ignoring chunk for first_chunk check: {chunk_str[:100]}...")
-                                # Yield the chunk but skip the first_chunk logic below
-                                #if chunk:
-                                #    yield chunk
-                                continue # Process next chunk
-
-                            # If it's not an ignored chunk AND we are still looking for the first *real* chunk
-                            if first_chunk:
-                                first_chunk = False # Mark that we've found the first *real* chunk
-                                logging.debug(f"Processing first *real* chunk from {target_url}: {chunk_str[:100]}...")
-                                # Check this first *real* chunk for error messages
-                                if '"error"' in chunk_str or '"detail"' in chunk_str:
-                                     try:
-                                         # Attempt to parse as JSON to get detail
-                                         error_json = json.loads(chunk_str.replace("data: ", "").strip())
-                                         error_detail = error_json.get("error", {}).get("message") or error_json.get("detail")
-                                     except Exception as json_e: # Catch specific JSON errors
-                                         logging.warning(f"Failed to parse potential error JSON in first chunk: {json_e}. Falling back to raw chunk.")
-                                         error_detail = chunk_str # Fallback to raw chunk
-                                     logging.warning(f"Error detected in first *real* stream chunk from {target_url}: {error_detail}")
-                                     error_in_stream = True
-                                     return # Stop the generator, do not yield the error chunk
-
-                        except UnicodeDecodeError:
-                            # If chunk is not UTF-8, we can't check its content.
-                            # If we were still looking for the first chunk, we can't check this one.
-                            # We'll proceed, but log it. The first *decodable* non-ignored chunk will be checked.
-                            logging.warning(f"Could not decode chunk from {target_url} as UTF-8. Skipping content check for this chunk.")
-                            if first_chunk:
-                                # We can't check this as the first chunk, but we need to eventually set first_chunk to False.
-                                # Let's assume it's not an error chunk and proceed.
-                                # The *next* decodable, non-ignored chunk will become the 'first_chunk' to check.
-                                # Alternatively, we could set first_chunk = False here, meaning we miss checking this undecodable one.
-                                # Let's stick to checking the first *decodable* non-ignored chunk.
-                                pass # Keep first_chunk = True until a decodable, non-ignored chunk arrives
-
-                        # Yield the current chunk if it's not empty (and wasn't an error chunk that caused a return)
-                        if chunk:
-                            yield chunk
-                        else: 
-                            logging.debug(f"Skipping empty chunk received from {target_url}")
-                            pass
-
-
-            # Check for error *before* returning the StreamingResponse
-            gen = stream_generator()
-            # Need to 'prime' the generator to catch immediate errors like status code errors
-            try:
-                first_yield = await gen.__anext__()
-                # If we got here, the first chunk (or status code) was okay (or it was empty)
-            except StopAsyncIteration:
-                 # Generator finished immediately, likely due to an error detected before first yield
-                 if error_in_stream:
-                     return None, error_detail # Signal error
-                 # Or it could be a genuinely empty successful stream                 
-                 pass # Continue to return the (now exhausted) generator below
-
-            if error_in_stream:
-                 return None, error_detail # Signal error based on check within generator
-
-            # If no immediate error, return the (potentially primed) generator
-            async def combined_generator():
-                nonlocal error_in_stream
-                # Yield the first chunk if it was successfully retrieved
-                if not first_chunk and not error_in_stream: # first_chunk is False if priming succeeded
-                    logging.debug(f"Yielding first chunk from {target_url}: {first_yield[:200]}...")  
-                    yield first_yield
-                # Yield the rest
-                async for chunk in gen:
-                    logging.debug(f"Yielding chunk from {target_url}: {chunk[:200]}...")  
-                    chunk_str = chunk.decode('utf-8')
-                    if chunk_str.startswith("data:") and '"code":' in chunk_str : # try if is an error chunk(openrouter)
-                            # Attempt to parse as JSON to get detail
-                            try:
-                                error_json = json.loads(chunk_str.replace("data: ", "").strip())
-                                error_detail = error_json.get("error", {}).get("message") or error_json.get("detail")
-                            except:
-                                error_detail = chunk_str # Fallback to raw chunk
-                            logging.warning(f"Error detected in stream chunk from {target_url}: {error_detail}")
-                            error_in_stream = True
-                            error_detail = chunk_str
-
-                    yield chunk
-
-            return StreamingResponse(
-                combined_generator(),
-                media_type="text/event-stream",
-                headers={"Transfer-Encoding": "chunked", "X-Accel-Buffering": "no"}
-            ), error_detail
-        else:
-            # Non-streaming request
-            response = await client.post(target_url, headers=headers, json=payload, timeout=None)
-            
-            # Check for HTTP errors
-            if response.status_code >= 400:
-                error_detail = response.text
-                logging.warning(f"Downstream error {response.status_code} from {target_url}: {error_detail}")
-                return None, error_detail # Signal error
-
-            # Check for errors in the JSON response body
-            try:
-                response_json = response.json()
-                if "error" in response_json or "detail" in response_json:
-                     error_detail = response_json.get("error", {}).get("message") or response_json.get("detail")
-                     logging.warning(f"Error detected in non-stream response from {target_url}: {error_detail}")
-                     return None, error_detail # Signal error
-                return response_json, None # Success
-            except json.JSONDecodeError as json_err:
-                 # Handle cases where the response is not valid JSON despite a 2xx status
-                 error_detail = f"Invalid JSON response from {target_url}: {response.text[:100]}..."
-                 logging.error(error_detail, exc_info=True)
-                 return None, error_detail # Signal error
-
-    except httpx.RequestError as e:
-        # Handle network errors, timeouts, etc.
-        error_detail = f"RequestError connecting to {target_url}: {str(e)}"
-        logging.error(error_detail, exc_info=True)
-        return None, error_detail # Signal error
-    except Exception as e:
-        # Catch unexpected errors during request processing
-        error_detail = f"Unexpected error during request to {target_url}: {str(e)}"
-        logging.error(error_detail, exc_info=True)
-        return None, error_detail # Signal error
 
 if __name__ == "__main__":
     import uvicorn
