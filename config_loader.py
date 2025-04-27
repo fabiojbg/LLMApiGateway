@@ -20,6 +20,7 @@ class ProviderDetails(BaseModel):
 class FallbackModelRule(BaseModel):
     provider: str
     model: str
+    use_provider_order_as_fallback: bool = False
     providers_order: Optional[List[str]] = None
 
 

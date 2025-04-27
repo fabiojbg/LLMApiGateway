@@ -26,7 +26,7 @@ from infra.llm_request import LLMRequest
 from config_loader import ConfigLoader
 
 # Initialize logging
-configure_logging() # Ensure logging is configured before first use
+configure_logging()
 
 # Initialize model rotation database
 model_rotation_db = ModelRotationDB()
@@ -36,7 +36,6 @@ config_loader = ConfigLoader()
 providers_config = config_loader.load_providers()
 fallback_rules = config_loader.load_fallback_rules()
     
-# Initialize FastAPI
 app = FastAPI()
 
 # Add middleware
@@ -208,7 +207,7 @@ async def chat_completions(request: Request):
         # --- Handle Different Provider Types ---
         
         # Case 1: Provider with sub-provider ordering (e.g., OpenRouter). Call each sub-provider in order instead of letting this to openrouter
-        if subproviders_ordering and len(subproviders_ordering) > 0: 
+        if subproviders_ordering and len(subproviders_ordering) > 0 and model_fallback_rule["use_provider_order_as_fallback"]== True: 
             logging.info(f"Provider '{provider_name}' uses sub-provider ordering. Target model: {provider_model}. Order: {subproviders_ordering}")
             
             for sub_provider in subproviders_ordering:
@@ -217,11 +216,11 @@ async def chat_completions(request: Request):
                 payload["model"] = provider_model # real provider model name
                 
                 # Add provider ordering info to the request (specific to providers like OpenRouter)
-                payload["provider"] = {"order": [sub_provider]} # Assuming it goes in the body based on old v1 logic
-                payload["allow_fallbacks"] = False
+                if( provider_name == "openrouter"):
+                    payload["provider"] = {"order": [sub_provider]} # Assuming it goes in the body based on old v1 logic
+                    payload["allow_fallbacks"] = False
 
-                # Make the request for this specific sub-provider
-                
+                # Make the request for this specific sub-provider                
                 response_data, error_detail = await LLMRequest.execute(client, target_url, headers, payload, is_streaming)
                 #response_data = None # for debugging only
                 #error_detail = 'test error' # for debugging only
@@ -247,6 +246,9 @@ async def chat_completions(request: Request):
             logging.info(f"Attempting standard provider '{provider_name}' with target model: {provider_model}")
             payload = copy.deepcopy(request_body_json)
             payload["model"] = provider_model # Override model if needed
+            if provider_name == "openrouter" and subproviders_ordering and len(subproviders_ordering) > 0:
+                payload["provider"] = {"order": subproviders_ordering} 
+                payload["allow_fallbacks"] = False
 
             # Make the request
             response_data, error_detail = await LLMRequest.execute(client, target_url, headers, payload, is_streaming)
@@ -278,6 +280,6 @@ if __name__ == "__main__":
     uvicorn.run(
         app, 
         host="0.0.0.0", 
-        port=settings.gateway_port, # not working, must be defined in the command line with --port parameter
+        port=settings.gateway_port, 
         log_level="debug",
     )
