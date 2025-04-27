@@ -138,19 +138,45 @@ app.add_middleware(
 client = httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=60.0)) 
 
 @app.get("/v1/models")
-async def get_models():
+async def get_models(): 
+    """Returns the list of models available in the gateway with the models in the fallback provider"""
     try:
+        response = {}
+        response["object"] = "list"
+        response["data"] = [{"id": model_name, "object": "model", "owned_by": "llmgateway"} for model_name in fallback_rules.keys()]
+        
+        # call fallback provider /models and append it to the response
+        fallback_provider_name = settings.fallback_provider
+        fallback_provider_config = providers_config.get(fallback_provider_name)
+        fallback_provider_base_url = fallback_provider_config.get("baseUrl")
+        fallback_provider_api_key_env_var = fallback_provider_config.get("apikey")
+        fallback_provider_api_key = os.getenv(fallback_provider_api_key_env_var)
         headers = {
-            "Authorization": f"Bearer {settings.target_api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            **({"Authorization": f"Bearer {fallback_provider_api_key}"} if fallback_provider_api_key else {})
         }
-        
-        response = await client.get(
-            f"{settings.target_server_url}/models",
-            headers=headers
-        )
-        
-        return response.json()
+        target_url = f"{fallback_provider_base_url.rstrip('/')}/models"
+        logging.info(f"Calling fallback provider '{fallback_provider_name}' for models list from {target_url}")
+        response_from_fallback = await client.get(target_url, headers=headers, timeout=None)
+        if response_from_fallback.status_code >= 400:
+            logging.warning(f"Downstream error {response_from_fallback.status_code} from {target_url}: {response_from_fallback.text}")
+            raise HTTPException(status_code=response_from_fallback.status_code, detail=response_from_fallback.text)
+        #continue if no error
+        try:
+            response_from_fallback_json = response_from_fallback.json()
+            if "error" in response_from_fallback_json or "detail" in response_from_fallback_json:
+                error_detail = response_from_fallback_json.get("error", {}).get("message") or response_from_fallback_json.get("detail")
+                logging.warning(f"Error detected in non-stream response from {target_url}: {error_detail}")
+                raise HTTPException(status_code=500, detail=error_detail)
+            # Append the models from the fallback provider to the response
+            for model in response_from_fallback_json["data"]:
+                if model["id"] not in [m["id"] for m in response["data"]]:
+                    response["data"].append(model)
+        except json.JSONDecodeError as json_err:
+            logging.error(f"Invalid JSON response from {target_url}: {response_from_fallback.text[:100]}...")
+            raise HTTPException(status_code=500, detail=f"Invalid JSON response from {target_url}: {response_from_fallback.text[:100]}...")
+
+        return response
     except httpx.HTTPStatusError as e:
         raise HTTPException(
             status_code=e.response.status_code,
