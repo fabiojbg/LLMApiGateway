@@ -1,6 +1,7 @@
 [
     {
         "gateway_model_name": "llmgateway/free-stack",
+        "rotate_models" : "false",
         "fallback_models" :
         [
             {
@@ -21,6 +22,7 @@
     },
     {
         "gateway_model_name": "llmgateway/deepseek-v3.1", 
+        "rotate_models" : "true",
         "fallback_models" :
         [
             {
@@ -46,4 +48,4 @@
             }
         ]                    
     }
-]  
+]    

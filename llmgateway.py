@@ -1,5 +1,6 @@
 # ///script
-# dependencies = ["fastapi", "httpx", "python-dotenv", "pydantic", "uvicorn", "python-json-logger"]
+# dependencies = ["fastapi", "httpx", "python-dotenv", 
+#                 "pydantic", "uvicorn", "python-json-logger"]
 # ///
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import StreamingResponse
@@ -19,9 +20,13 @@ from pathlib import Path
 import sys
 import asyncio # Added for potential delays/retries if needed later
 import copy # Added for deep copying request body
+from db.model_rotation import ModelRotationDB
 
 # Initialize logging
 configure_logging() # Ensure logging is configured before first use
+
+# Initialize model rotation database
+model_rotation_db = ModelRotationDB()
 
 # Load models fallback rules from JSON file
 providers_config = {}
@@ -73,15 +78,26 @@ try:
             full_mapping = json.load(f)
 
             # Normalize model routing rules into a dictionary
-            fallback_rules = {
-                m["gateway_model_name"]: m["fallback_models"] 
-                for m in full_mapping
-            }
+            fallback_rules = {}
+            for m in full_mapping:
+                gateway_model_name = m["gateway_model_name"]
+                fallback_models = m["fallback_models"]
+                rotate_models = m.get("rotate_models", False)
+                
+                # Convert string "true"/"false" to boolean if needed
+                if isinstance(rotate_models, str):
+                    rotate_models = rotate_models.lower() == "true"
+                
+                fallback_rules[gateway_model_name] = {
+                    "fallback_models": fallback_models,
+                    "rotate_models": rotate_models
+                }
 
             # **** validate all data in json ****
             # verify if the providers defined for the fallback models are valid
             for gateway_model_name in fallback_rules:
-                fallback_models = fallback_rules[gateway_model_name]
+                model_config = fallback_rules[gateway_model_name]
+                fallback_models = model_config["fallback_models"]
                 if fallback_models is None:
                     logging.error(f"Gateway model '{gateway_model_name}' must have at least one fallback model defined.")
                     sys.exit(1)
@@ -212,14 +228,37 @@ async def chat_completions_v2(request: Request):
         raise HTTPException(status_code=400, detail="Missing 'model' in request body")
 
     # 1. Find Routing Rule or Use Fallback
-    model_fallbacks_sequence = fallback_rules.get(requested_model)
-    if not model_fallbacks_sequence:
+    model_config = fallback_rules.get(requested_model)
+    if not model_config:
         logging.warning(f"No specific fallback sequence found for model '{requested_model}'. Using '{settings.fallback_provider}' fallback provider.")
 
-        model_fallbacks_sequence = [{"provider": fallback_provider_name, "model": requested_model}] # Use the fallback provider as a single-item sequence
-        logging.info(f"Using fallback provider: {fallback_provider_name}")
+        model_fallbacks_sequence = [{"provider": settings.fallback_provider, "model": requested_model}] # Use the fallback provider as a single-item sequence
+        rotate_models = False
+        logging.info(f"Using fallback provider: {settings.fallback_provider}")
     else:
-         logging.info(f"Found routing rule for model '{requested_model}'. Provider sequence length: {len(model_fallbacks_sequence)}")
+        model_fallbacks_sequence = model_config["fallback_models"]
+        rotate_models = model_config["rotate_models"]
+        logging.info(f"Found routing rule for model '{requested_model}'. Provider sequence length: {len(model_fallbacks_sequence)}")
+        logging.info(f"Model rotation is {'enabled' if rotate_models else 'disabled'} for model '{requested_model}'")
+
+    # Get API key from request headers
+    api_key = request.headers.get("Authorization", "").replace("Bearer ", "")
+
+    # If model rotation is enabled, determine the starting index
+    start_index = 0
+    if rotate_models and len(model_fallbacks_sequence) > 1:
+        start_index = model_rotation_db.get_next_model_index(
+            api_key=api_key,
+            gateway_model=requested_model,
+            total_models=len(model_fallbacks_sequence)
+        )
+        logging.info(f"Model rotation: Starting with model index {start_index} for '{requested_model}'")
+
+    # Reorder the sequence to start from the selected index if rotation is enabled
+    if rotate_models and len(model_fallbacks_sequence) > 1:
+        # Create a new sequence starting from the selected index
+        reordered_sequence = model_fallbacks_sequence[start_index:] + model_fallbacks_sequence[:start_index]
+        model_fallbacks_sequence = reordered_sequence
 
 
     # 2. Iterate Through Providers and Attempt Requests
@@ -326,7 +365,7 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
 
     payload_to_log = copy.deepcopy(payload)
     payload_to_log["messages"] = "<REMOVED>" # Remove messages from payload for logging
-    logging.debug(f"make_v2_request(): Sending request for model \'{payload_to_log['model']}\'. Payload: {payload_to_log}") # Log the payload without messages
+    logging.debug(f"make_llm_request(): Sending request for model \'{payload_to_log['model']}\'. Payload: {payload_to_log}") # Log the payload without messages
     try:
         if is_streaming:
             async def stream_generator():

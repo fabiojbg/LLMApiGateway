@@ -12,6 +12,10 @@ LLM Gateway works as an OpenAI-compatible LLM API provider with advanced fallbac
 Use it with code agents like Cline, RooCode, or even with your apps as a regular LLM provider compatible with the OpenAI API.  
 ## Features
 
+- **Fault Tolerance**: Automatically falls back to alternative models if the primary model fails
+- **Model Rotation**: Optionally rotates through available models for each API key, distributing load and cost across providers
+- **Flexible Configuration**: Configure fallback sequences and rotation settings per model
+
 ## Gateway endpoints
 
   - `/v1/models` - Like v1, just lists available models <br/><br/>
@@ -69,6 +73,7 @@ APIKEY_KLUSTERAI=<your_klusterai_api_key>
     {
         // an example of only free models which we'll call "llmgateway/free-stack"
         "gateway_model_name": "llmgateway/free-stack",
+        "rotate_models": false,  // Set to true to enable model rotation
         "fallback_models" :
         [
             {
@@ -90,6 +95,7 @@ APIKEY_KLUSTERAI=<your_klusterai_api_key>
     {
         // an example of a model that exists in various providers
         "gateway_model_name": "llmgateway/deepseek-v3.1", 
+        "rotate_models": true,  // This model will rotate through providers even without failures
         "fallback_models" :
         [
             {
@@ -118,15 +124,26 @@ APIKEY_KLUSTERAI=<your_klusterai_api_key>
 ]    
 ```
 
-**Failover Logic:**
+**Failover and Rotation Logic:**
 
 When a request comes to `/v1/chat/completions`:
 
 1.  The gateway finds the rule matching the requested `model` in the models_fallback_rules.json
 2.  If the model is not found in the rules, route the request to the fallback provider defined by the FALLBACK_PROVIDER environment variable. The name of the model is the same as received.
-3.  If it finds the model, call the model defined in the first rule to its corresponding provider.
-4.  If the first call fails, try the next ones until some succeed
-5.  Return error HTTP 503 if none of the called models succeed.
+3.  If model rotation is enabled (`"rotate_models": true`), the gateway selects the next model in the sequence based on the API key and model combination.
+4.  If model rotation is disabled, the gateway starts with the first model in the sequence.
+5.  If the selected model fails, the gateway tries the next models in the sequence until one succeeds.
+6.  Return error HTTP 503 if none of the called models succeed.
+
+**Model Rotation:**
+
+The model rotation feature allows you to distribute requests across multiple providers even when there are no failures. This is useful for:
+
+- Load balancing across different providers
+- Avoiding rate limits on individual providers
+- Reducing costs by distributing usage
+
+The rotation state is tracked per API key and gateway model combination, ensuring consistent behavior for each client.
 
 ## Running
 
