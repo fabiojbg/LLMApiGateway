@@ -1,15 +1,19 @@
 # Fault-Tolerant LLM Gateway
 ---
 <div align="center" style="text-align: center;">
- <img alt="AI Text Corrector" src="https://img.shields.io/badge/LLM-Gateway-blue?style=flat" />&nbsp;
+ <img alt="LLM Gateway" src="https://img.shields.io/badge/LLM-Gateway-blue?style=flat" />&nbsp;
+ <a href="https://openrouter.ai"><img alt="OpenRouter" src="https://img.shields.io/badge/OpenRouter-AI-blue?style=flat" /></a>
+ &nbsp;
  <a href="https://www.paypal.com/donate/?business=G47L9N4UW8C2C&no_recurring=1&item_name=Thank+you+%21%21%21&currency_code=USD"><img alt="Download" src="https://img.shields.io/badge/Donate-😊-yellow?style=flat" /></a>
+  
 </div>
 <br>
 
-Don't experience failures from API calls to your LLM models anymore, no matter which provider you're using.  
-This project can replace providers to give you a nearly infallible LLM model provider.  
-LLM Gateway works as an OpenAI-compatible LLM API provider with advanced fallback support for models in case of response failures.  
-Use it with code agents like Cline, RooCode, or even with your apps as a regular LLM provider compatible with the OpenAI API.  
+Stop having API call failures to your LLM models, no matter which provider you are using.
+This project can replace providers to give you an almost foolproof LLM model provider.
+LLM Gateway works as an OpenAI-compatible LLM API provider with advanced fallback support for models in case of response failures.
+Use it with code agents like Cline, RooCode, or even with your applications as a regular OpenAI API-compatible LLM provider.
+
 ## Features
 
 - **Fault Tolerance**: Automatically falls back to alternative models if the primary model fails
@@ -45,8 +49,8 @@ LOG_CHAT_ENABLED=false
 # by this gateway in the fallback rules.
 FALLBACK_PROVIDER=openrouter
 
-# The keys of your providers. Used in the providers
-# Fill the ones you want to use or add more if you like
+# The keys of your providers. Used in the providers.json
+# Fill the ones you want to use or add more if you need
 APIKEY_OPENROUTER=<your_openrouter_api_key>
 APIKEY_REQUESTY=<your_requesty_api_key>
 APIKEY_OPENAI=<your_openai_api_key>
@@ -65,15 +69,47 @@ APIKEY_KLUSTERAI=<your_klusterai_api_key>
 | `FALLBACK_PROVIDER` | Default provider name for `/v2` if no rule matches | `openrouter` |
 | `APIKEY_PROVIDERNAME` | API key for a specific provider (e.g., `APIKEY_OPENROUTER`) | *required for providers in providers.json* |
 
+## Providers Example (`providers.json`)
+Here, you must define your providers. These providers must be compatible with the OpenAI API format.
+The `apikey` fields are keys to the environment variables with the actual key value.
+
+```json
+[
+    {
+        "openrouter":
+        {
+            "baseUrl" : "https://openrouter.ai/api/v1",            
+            "apikey" : "APIKEY_OPENROUTER"  //environment variable name that holds the provider apykey
+        }
+    },
+    {
+        "nebius":
+        {
+            "baseUrl" : "https://api.studio.nebius.ai/v1",            
+            "apikey" : "APIKEY_NEBIUS" //environment variable name that holds the provider apykey
+        }
+    },
+    {
+        "openai":
+        {
+            "baseUrl" : "https://api.openai.com/v1",            
+            "apikey" : "APIKEY_OPENAI" //environment variable name that holds the provider apykey
+        }
+    }
+]
+```
+
 
 ### Fallback Rules JSON Example (`models_fallback_rules.json`):
 
+#### Simple fallback 
+In this mode (`rotate_models=false`), the gateway always starts with the first model in each request and falls back to the next ones in case of failures.
 ```json
 [
     {
         // an example of only free models which we'll call "llmgateway/free-stack"
         "gateway_model_name": "llmgateway/free-stack",
-        "rotate_models": false,  // Set to true to enable model rotation
+        "rotate_models": false,  // no rotation, always starts with the first model and falls back to the rest if needed
         "fallback_models" :
         [
             {
@@ -88,14 +124,22 @@ APIKEY_KLUSTERAI=<your_klusterai_api_key>
             {
                 "provider": "openrouter",
                 "model" : "deepseek/deepseek-chat-v3-0324:free",
+                "use_provider_order_as_fallback": true, // use only the first provider and falls back to the next ones only in case of failure
                 "providers_order" : ["Chutes", "Targon"]
             }
         ]                    
-    },
+    }
+]
+```
+
+#### Model Rotation
+In this mode (`rotate_models=true`), the gateway cycles through all models between requests. This is useful when we want to utilize credits from various providers. Fallback also works in this mode in case of failures; the sequence loops back to the first model when the sequence finishes.
+```json
+[
     {
         // an example of a model that exists in various providers
         "gateway_model_name": "llmgateway/deepseek-v3.1", 
-        "rotate_models": true,  // This model will rotate through providers even without failures
+        "rotate_models": true,  // When true, gatweway will rotate through models between requests.
         "fallback_models" :
         [
             {
@@ -108,16 +152,8 @@ APIKEY_KLUSTERAI=<your_klusterai_api_key>
                 "model": "deepseek-ai/DeepSeek-V3-0324"
             },
             {
-                "provider": "together",
-                "model" : "deepseek-ai/DeepSeek-V3"
-            },
-            {
                 "provider": "requesty",
                 "model" : "novita/deepseek/deepseek-v3-0324"
-            },
-            {
-                "provider": "requesty",
-                "model" : "novita/deepseek/deepseek-v3-turbo"
             }
         ]                    
     }
@@ -128,12 +164,13 @@ APIKEY_KLUSTERAI=<your_klusterai_api_key>
 
 When a request comes to `/v1/chat/completions`:
 
-1.  The gateway finds the rule matching the requested `model` in the models_fallback_rules.json
-2.  If the model is not found in the rules, route the request to the fallback provider defined by the FALLBACK_PROVIDER environment variable. The name of the model is the same as received.
-3.  If model rotation is enabled (`"rotate_models": true`), the gateway selects the next model in the sequence based on the API key and model combination.
-4.  If model rotation is disabled, the gateway starts with the first model in the sequence.
-5.  If the selected model fails, the gateway tries the next models in the sequence until one succeeds.
-6.  Return error HTTP 503 if none of the called models succeed.
+1.  The gateway finds the rule matching the requested `model` in the models_fallback_rules.json file.
+2.  If the model is not found in the rules, the gateway routes the request to the fallback provider defined by the FALLBACK_PROVIDER environment variable. The name of the model will be the same as received.
+3.  If model rotation is enabled (`"rotate_models": true`), the gateway selects the next model in the sequence for each request.
+4.  If model rotation is disabled (`"rotate_models": false` or ommited), the gateway always starts with the first model in the sequence and only falls back to the next ones in case of failure.
+5.  (OpenRouter only) If the current model has the parameter `use_provider_order_as_fallback=true` and has a list of `providers_order`, the gateway will use only the first provider in the list and fall back to the next ones only in case of failures. This way, the fallback is treated by this gateway and not OpenRouter.
+6.  If the selected model fails, the gateway tries the next models in the sequence until one succeeds.
+7.  Return an HTTP 503 error if none of the called models succeed.
 
 **Model Rotation:**
 

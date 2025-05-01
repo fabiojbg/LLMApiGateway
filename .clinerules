@@ -1,0 +1,13 @@
+# Project Guidelines
+
+## Documentation Requirements
+
+-   Keep README.md in sync with new capabilities
+
+## Code Style & Patterns
+
+-   Generate API clients using fastAPI
+-   Prefer use object oriented approach
+
+## Testing Standards
+
