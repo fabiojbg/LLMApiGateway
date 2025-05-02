@@ -89,11 +89,11 @@ class LLMRequest:
                     nonlocal error_in_stream, error_detail # Ensure error_detail can be modified
                     # Yield the first chunk if it was successfully retrieved
                     if not first_chunk and not error_in_stream: # first_chunk is False if priming succeeded
-                        logging.debug(f"Yielding first chunk from {target_url}: {first_yield[:200]}...")  
+                        logging.debug(f"Yielding first chunk from {target_url}: {first_yield[:400]}...")  
                         yield first_yield
                     # Yield the rest
                     async for chunk in gen:
-                        logging.debug(f"Yielding chunk from {target_url}: {chunk[:200]}...")  
+                        logging.debug(f"Yielding chunk from {target_url}: {chunk[:400]}...")  
                         try:
                             chunk_str = chunk.decode('utf-8')
                             # Check for errors within the stream (e.g., OpenRouter error format)
@@ -111,8 +111,7 @@ class LLMRequest:
                                 return # Stop the generator on error
                         except UnicodeDecodeError:
                              logging.warning(f"Could not decode chunk from {target_url} as UTF-8 during combined generation.")
-                             # Decide whether to yield the raw bytes or skip
-                             # Yielding raw bytes might break downstream consumers expecting text
+                             # Decide whether to yield the raw bytes or skip Yielding raw bytes might break downstream consumers expecting text
                              # Skipping might lose data. Let's yield for now.
                              pass # Or yield chunk if raw bytes are acceptable downstream
 

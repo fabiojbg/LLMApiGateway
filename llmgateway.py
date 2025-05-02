@@ -21,6 +21,7 @@ from config_loader import FallbackModelRule, ProviderDetails # Import corrected 
 from infra.llm_request import LLMRequest
 from config_loader import ConfigLoader
 from settings import Settings
+from chat_logging import write_log_complete
 
 # Initialize logging
 configure_logging()
@@ -212,12 +213,15 @@ async def chat_completions(request: Request):
             for sub_provider in subproviders_ordering:
                 logging.info(f"Attempting sub-provider: {sub_provider} via {provider_name} for {provider_model}")
                 payload = copy.deepcopy(request_body_json)
-                payload["model"] = provider_model # real provider model name
-                
+                payload["model"] = provider_model # real provider model name                
                 # Add provider ordering info to the request (specific to providers like OpenRouter)
-                if( provider_name == "openrouter"):
+                if provider_name == "openrouter":
                     payload["provider"] = {"order": [sub_provider]} # Assuming it goes in the body based on old v1 logic
                     payload["allow_fallbacks"] = False
+                    additional_params = model_fallback_rule.get("additional_payload_params", {})
+                    if additional_params:
+                        for key, value in additional_params.items():
+                            payload[key] = value
 
                 # Make the request for this specific sub-provider                
                 response_data, error_detail = await LLMRequest.execute(client, target_url, headers, payload, is_streaming)
@@ -245,9 +249,14 @@ async def chat_completions(request: Request):
             logging.info(f"Attempting standard provider '{provider_name}' with target model: {provider_model}")
             payload = copy.deepcopy(request_body_json)
             payload["model"] = provider_model # Override model if needed
-            if provider_name == "openrouter" and subproviders_ordering and len(subproviders_ordering) > 0:
-                payload["provider"] = {"order": subproviders_ordering} 
-                payload["allow_fallbacks"] = False
+            if provider_name == "openrouter" :
+                if subproviders_ordering and len(subproviders_ordering) > 0:
+                    payload["provider"] = {"order": subproviders_ordering} 
+                    payload["allow_fallbacks"] = False
+                additional_params = model_fallback_rule.get("additional_payload_params", {})
+                if additional_params:
+                    for key, value in additional_params.items():
+                        payload[key] = value
 
             # Make the request
             response_data, error_detail = await LLMRequest.execute(client, target_url, headers, payload, is_streaming)

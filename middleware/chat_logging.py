@@ -40,8 +40,7 @@ def write_log(req_headers, req_body_str, llm_response_accum):
 
 async def log_chat_completions(request: Request, call_next: Callable) -> Response:
     # Only intercept the "/v1/chat/completions" endpoint
-    if (request.url.path != "/v1/chat/completions" and 
-        request.url.path != "/v2/chat/completions"):
+    if not request.url.path.endswith("/chat/completions"):
         return await call_next(request)
     
     # Capture request body and headers
@@ -53,8 +52,8 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
     
     response = await call_next(request)
     
-    # If response is streaming, wrap its iterator to accumulate LLM response content
-    if isinstance(response, StreamingResponse):
+    # If response is streaming, wrap its iterator to accumulate LLM response content    
+    if "StreamingResponse" in type(response).__name__ :
         original_iterator = response.body_iterator
         async def accumulated_generator():
             nonlocal llm_response_accum
@@ -97,3 +96,33 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
         write_log(req_headers, req_body_str, llm_response_accum)
     
     return response
+
+def write_log_complete(req_headers, req_body_str, forwarded_headers, forwarded_body, llm_reasoning, llm_response):
+    # Create log file with the required name format: "YY-MM-DD_HH:MM:ss:mmm.txt"
+    log_time = datetime.now()
+    filename = log_time.strftime("%Y-%m-%d_%H-%M-%S") + (".%03d" % (log_time.microsecond // 1000)) + ".txt"
+    division_line = "-" * 100
+    log_content = (
+        f"{division_line}\nRequest Headers:\n{division_line}\n\n{pformat(req_headers, indent=2)}\n\n"
+        f"{division_line}\nForwarded Headers:\n-{division_line}\n\n{forwarded_headers}\n\n"
+        f"{division_line}\nRequest Body:\n-{division_line}\n\n{req_body_str}\n\n"
+        f"{division_line}\nForwarded Body:\n-{division_line}\n\n{forwarded_body}\n\n"
+        f"{division_line}\nLLM Reasoning:\n{division_line}\n\n{llm_reasoning}"
+        f"{division_line}\nLLM Response:\n{division_line}\n\n{llm_response}"
+    )
+    os.makedirs("logs", exist_ok=True)
+    log_path = os.path.join("./logs", filename)
+    
+    # Write the new log file
+    with open(log_path, "w", encoding="utf-8") as f:
+        log_content = log_content.replace("\\n\\n", "\r\n\r\n").replace("\\n", "\r\n")  # replace the sequence \n inside json elements to make it more readable
+        f.write(log_content)
+    
+    # Clean up old logs if over limit
+    log_files = sorted(glob.glob(os.path.join("./logs", "*.txt")), key=os.path.getmtime)
+    max_logs = log_file_limit or 50
+    while len(log_files) > max_logs:
+        try:
+            os.remove(log_files.pop(0))
+        except Exception:
+            pass

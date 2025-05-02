@@ -1,5 +1,7 @@
 # Project Guidelines
 
+- working with the project. To know what the project is about, read the README.md project file.
+
 ## Documentation Requirements
 
 -   Keep README.md in sync with new capabilities
@@ -8,6 +10,10 @@
 
 -   Generate API clients using fastAPI
 -   Prefer use object oriented approach
+
+## Package management
+
+- This project supports pip and uv package managers. You must mantain the requirements.txt and pyproject.toml in any change of the dependencies
 
 ## Testing Standards
 

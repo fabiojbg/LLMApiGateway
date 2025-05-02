@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Launch llmgateway.py",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/llmgateway.py",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env"
+    }
+  ]
+}
