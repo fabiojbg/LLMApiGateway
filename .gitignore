@@ -99,11 +99,13 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.venv/
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+uv.lock
 Scripts/
 Lib/
 pyvenv.cfg

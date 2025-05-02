@@ -1,20 +1,16 @@
-# ///script
-# dependencies = ["fastapi", "httpx", "python-dotenv", 
-#                 "pydantic", "uvicorn", "python-json-logger"]
-# ///
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import os
-from typing import Optional
+from typing import Optional, Dict, Any
 import logging
 from logging.config import dictConfig
 from pydantic import BaseModel
 from middleware.logging import log_middleware
 from middleware.chat_logging import log_chat_completions
 from middleware.auth import api_key_auth
-from config import settings, configure_logging
+from config import configure_logging
 import json
 from pathlib import Path
 import sys
@@ -24,6 +20,7 @@ from db.model_rotation import ModelRotationDB
 from config_loader import FallbackModelRule, ProviderDetails # Import corrected for type hints
 from infra.llm_request import LLMRequest
 from config_loader import ConfigLoader
+from settings import Settings
 
 # Initialize logging
 configure_logging()
@@ -41,7 +38,7 @@ app = FastAPI()
 # Add middleware
 app.middleware("http")(log_middleware)
 app.middleware("http")(api_key_auth)
-if settings.log_chat_messages:
+if Settings.log_chat_messages:
     app.middleware("http")(log_chat_completions)
 
 # CORS middleware
@@ -66,7 +63,7 @@ async def get_models():
         response["data"] = [{"id": model_name, "object": "model", "owned_by": "llmgateway"} for model_name in fallback_rules.keys()]
         
         # call fallback provider /models and append it to the response
-        fallback_provider_name = settings.fallback_provider
+        fallback_provider_name = Settings.fallback_provider
         fallback_provider_config: Optional[ProviderDetails] = providers_config.get(fallback_provider_name)
         if not fallback_provider_config:
             logging.error(f"Fallback provider '{fallback_provider_name}' configuration not found.")
@@ -140,11 +137,11 @@ async def chat_completions(request: Request):
     # model_config is a dictionary loaded from fallback_rules.json, not a ModelFallbackConfig object
     model_config: Optional[Dict[str, Any]] = fallback_rules.get(requested_model) 
     if not model_config:
-        logging.warning(f"No specific fallback sequence found for model '{requested_model}'. Using '{settings.fallback_provider}' fallback provider.")
+        logging.warning(f"No specific fallback sequence found for model '{requested_model}'. Using '{Settings.fallback_provider}' fallback provider.")
 
-        model_fallbacks_sequence = [{"provider": settings.fallback_provider, "model": requested_model}] # Use the fallback provider as a single-item sequence
+        model_fallbacks_sequence = [{"provider": Settings.fallback_provider, "model": requested_model}] # Use the fallback provider as a single-item sequence
         rotate_models = False
-        logging.info(f"Using fallback provider: {settings.fallback_provider}")
+        logging.info(f"Using fallback provider: {Settings.fallback_provider}")
     else:
         model_fallbacks_sequence = model_config["fallback_models"]
         rotate_models = model_config["rotate_models"]
@@ -276,10 +273,9 @@ async def chat_completions(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    from config import settings
     uvicorn.run(
         app, 
         host="0.0.0.0", 
-        port=settings.gateway_port, 
+        port=Settings.gateway_port, 
         log_level="debug",
     )

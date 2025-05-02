@@ -3,7 +3,7 @@ import json
 import glob
 from datetime import datetime
 from pprint import pformat
-from config import settings
+from settings import Settings
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
 from typing import Callable
@@ -28,7 +28,7 @@ def write_log(req_headers, req_body_str, llm_response_accum):
     
     # Clean up old logs if over limit
     log_files = sorted(glob.glob(os.path.join(".\\logs", "*.txt")), key=os.path.getmtime)
-    max_logs = settings.log_file_limit or 50
+    max_logs = Settings.log_file_limit or 50
     while len(log_files) > max_logs:
         try:
             os.remove(log_files.pop(0))
