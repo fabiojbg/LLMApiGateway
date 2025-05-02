@@ -1,4 +1,4 @@
-import json
+import json5
 import logging
 import os
 import sys
@@ -47,7 +47,7 @@ class ConfigLoader:
         
         try:
             with open(self.providers_path) as f:
-                raw_mapping = json.load(f)
+                raw_mapping = json5.load(f)
 
             providers_config_temp = {}
             for item in raw_mapping:
@@ -63,7 +63,7 @@ class ConfigLoader:
             logging.info(f"Loaded providers: {list(self.providers_config.keys())}")
             return self.providers_config
 
-        except (json.JSONDecodeError, ValidationError, ValueError) as e:
+        except (json5.JSONDecodeError, ValidationError, ValueError) as e:
             logging.error(f"Failed to load or validate '{self.providers_path.name}': {str(e)}", exc_info=True)
             sys.exit(1)
         except Exception as e:
@@ -93,7 +93,7 @@ class ConfigLoader:
 
         try:
             with open(self.fallback_rules_path) as f:
-                raw_rules = json.load(f)
+                raw_rules = json5.load(f)
 
             fallback_rules_temp = {}
             validated_rules = [ModelFallbackConfig(**item) for item in raw_rules]
@@ -110,7 +110,7 @@ class ConfigLoader:
             logging.info(f"Loaded model rules for: {list(self.fallback_rules.keys())}")
             return self.fallback_rules
 
-        except (json.JSONDecodeError, ValidationError) as e:
+        except (json5.JSONDecodeError, ValidationError) as e:
             logging.error(f"Failed to load or validate '{self.fallback_rules_path.name}': {str(e)}", exc_info=True)
             sys.exit(1)
         except Exception as e:
@@ -142,4 +142,3 @@ class ConfigLoader:
                 if provider not in self.providers_config:
                     logging.error(f"Invalid provider '{provider}' used in fallback rule for '{gateway_model_name}'. Provider not found in configuration.")
                     sys.exit(1)
-

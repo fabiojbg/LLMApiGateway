@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+      "**/models_fallback_rules.json": "jsonc",
+      "**/providers.json": "jsonc",
+    }
+  }

@@ -195,6 +195,8 @@ async def chat_completions(request: Request):
 
         headers = {
             "Content-Type": "application/json",
+            "X-Title": "LLMGateway",
+            "HTTP-Referer": "https://github.com/fabiojbg/LLMApiGateway",
             # Add Authorization header only if api_key is present
             **({"Authorization": f"Bearer {provider_api_key}"} if provider_api_key else {})
         }
