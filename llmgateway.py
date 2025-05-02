@@ -21,7 +21,6 @@ from config_loader import FallbackModelRule, ProviderDetails # Import corrected 
 from infra.llm_request import LLMRequest
 from config_loader import ConfigLoader
 from settings import Settings
-from chat_logging import write_log_complete
 
 # Initialize logging
 configure_logging()
@@ -204,7 +203,16 @@ async def chat_completions(request: Request):
         
         target_url = f"{provider_base_url.rstrip('/')}/chat/completions" # Ensure single slash
 
-        # --- Handle Different Provider Types ---
+        payload = copy.deepcopy(request_body_json)
+        payload["model"] = provider_model # real provider model name                
+        custom_body_params = model_fallback_rule.get("custom_body_params", {})
+        if custom_body_params:
+            for key, value in custom_body_params.items():
+                payload[key] = value
+        custom_headers = model_fallback_rule.get("custom_headers", {})
+        if custom_headers:
+            for key, value in custom_headers.items():
+                headers[key] = value
         
         # Case 1: Provider with sub-provider ordering (e.g., OpenRouter). Call each sub-provider in order instead of letting this to openrouter
         if subproviders_ordering and len(subproviders_ordering) > 0 and model_fallback_rule["use_provider_order_as_fallback"]== True: 
@@ -212,16 +220,11 @@ async def chat_completions(request: Request):
             
             for sub_provider in subproviders_ordering:
                 logging.info(f"Attempting sub-provider: {sub_provider} via {provider_name} for {provider_model}")
-                payload = copy.deepcopy(request_body_json)
-                payload["model"] = provider_model # real provider model name                
+
                 # Add provider ordering info to the request (specific to providers like OpenRouter)
                 if provider_name == "openrouter":
                     payload["provider"] = {"order": [sub_provider]} # Assuming it goes in the body based on old v1 logic
                     payload["allow_fallbacks"] = False
-                    additional_params = model_fallback_rule.get("additional_payload_params", {})
-                    if additional_params:
-                        for key, value in additional_params.items():
-                            payload[key] = value
 
                 # Make the request for this specific sub-provider                
                 response_data, error_detail = await LLMRequest.execute(client, target_url, headers, payload, is_streaming)
@@ -247,17 +250,15 @@ async def chat_completions(request: Request):
         # Case 2: Standard Provider (or fallback)
         else:
             logging.info(f"Attempting standard provider '{provider_name}' with target model: {provider_model}")
+            
             payload = copy.deepcopy(request_body_json)
-            payload["model"] = provider_model # Override model if needed
+            payload["model"] = provider_model # real provider model name                
+           
             if provider_name == "openrouter" :
                 if subproviders_ordering and len(subproviders_ordering) > 0:
                     payload["provider"] = {"order": subproviders_ordering} 
                     payload["allow_fallbacks"] = False
-                additional_params = model_fallback_rule.get("additional_payload_params", {})
-                if additional_params:
-                    for key, value in additional_params.items():
-                        payload[key] = value
-
+                      
             # Make the request
             response_data, error_detail = await LLMRequest.execute(client, target_url, headers, payload, is_streaming)
             #response_data = None # for debugging only
@@ -280,7 +281,6 @@ async def chat_completions(request: Request):
     # 3. If all providers failed
     logging.error(f"All providers failed for model '{requested_model}'. Last error: {last_error_detail}")
     raise HTTPException(status_code=503, detail=f"All configured providers failed for model '{requested_model}'. Last error: {last_error_detail}")
-
 
 if __name__ == "__main__":
     import uvicorn
