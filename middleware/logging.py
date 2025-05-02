@@ -15,6 +15,7 @@ async def log_middleware(request: Request, call_next: Callable):
     
     # Log request
     request_id = request.headers.get("X-Request-ID", "none")
+    logger.info("--------------INCOMING REQUEST---------------------------")
     logger.info({
         "message": "Incoming request",
         "method": request.method,

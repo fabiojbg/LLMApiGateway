@@ -177,7 +177,7 @@ async def chat_completions(request: Request):
         provider_model = model_fallback_rule["model"]
         subproviders_ordering = model_fallback_rule.get("providers_order") # Use .get() for optional field
 
-        logging.info(f"Attempting provider: {provider_name} for model '{requested_model}' and subproviders ordering: {subproviders_ordering}")
+        logging.info(f"------------ ATTEMPTING MODEL: {provider_model} in {provider_name} and subproviders ordering: {subproviders_ordering}")
 
         provider_config: Optional[ProviderDetails] = providers_config.get(provider_name) # Accessing the dict is correct here
         if not provider_config:
@@ -232,15 +232,18 @@ async def chat_completions(request: Request):
                 #error_detail = 'test error' # for debugging only
 
                 if response_data and error_detail is None:
-                    logging.info(f"Connection success with provider '{provider_name}' via '{sub_provider}' for model '{provider_model}'. Starting streaming response...")
+                    logging.info(f"Connection success with model '{provider_model}' from provider '{provider_name}' via '{sub_provider}'. Starting streaming response...")
                     return response_data # Success! Return the response.
                 else:
+                    logging.warning(f"--------------- MODEL FAILURE ({provider_model})---------------")
+                    payload["messages"] = "<REMOVED>" # Remove messages from payload for logging
                     logging.warning(f"Failed attempt with sub-provider '{sub_provider}' via '{provider_name}'. Error: {error_detail}")
                     logging.warning(f"Failed attempt with model '{provider_model}' via '{provider_name}' and subprovider '{sub_provider}'.\r\n" \
                                     f"Error: {error_detail}\r\n" \
                                     f"Target Url: {target_url}\r\n" \
                                     f"Payload: {payload}")
-                    last_error_detail = f"Provider '{provider_name}' failed via sub-provider {sub_provider}: {error_detail}"
+                    
+                    last_error_detail = f"Failed attempt with sub-provider '{sub_provider}' via '{provider_name}'. Error: {error_detail}"
                     # Continue to the next sub-provider in the inner loop
 
             # If all sub-providers failed, continue to the next main provider in the outer loop
