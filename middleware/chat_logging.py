@@ -3,10 +3,13 @@ import json
 import glob
 from datetime import datetime
 from pprint import pformat
-from settings import Settings
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
 from typing import Callable
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
+log_file_limit : int | None = int(os.getenv("LOG_FILE_LIMIT", 15))
 
 def write_log(req_headers, req_body_str, llm_response_accum):
     # Create log file with the required name format: "YY-MM-DD_HH:MM:ss:mmm.txt"
@@ -19,7 +22,7 @@ def write_log(req_headers, req_body_str, llm_response_accum):
         f"{division_line}\nLLM Response:\n{division_line}\n\n{llm_response_accum}"
     )
     os.makedirs("logs", exist_ok=True)
-    log_path = os.path.join(".\\logs", filename)
+    log_path = os.path.join("./logs", filename)
     
     # Write the new log file
     with open(log_path, "w", encoding="utf-8") as f:
@@ -28,7 +31,7 @@ def write_log(req_headers, req_body_str, llm_response_accum):
     
     # Clean up old logs if over limit
     log_files = sorted(glob.glob(os.path.join(".\\logs", "*.txt")), key=os.path.getmtime)
-    max_logs = Settings.log_file_limit or 50
+    max_logs = log_file_limit or 50
     while len(log_files) > max_logs:
         try:
             os.remove(log_files.pop(0))

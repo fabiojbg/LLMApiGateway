@@ -50,7 +50,7 @@ class LLMRequest:
                                         try:
                                             # Attempt to parse as JSON to get detail
                                             error_json = json.loads(chunk_str.replace("data: ", "").strip())
-                                            error_detail = error_json.get("error", {}).get("message") or error_json.get("detail")
+                                            error_detail = error_json
                                         except Exception as json_e: # Catch specific JSON errors
                                             logging.warning(f"Failed to parse potential error JSON in first chunk: {json_e}. Falling back to raw chunk.")
                                             error_detail = chunk_str # Fallback to raw chunk
