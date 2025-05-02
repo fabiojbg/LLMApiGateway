@@ -30,7 +30,7 @@ def write_log(req_headers, req_body_str, llm_response_accum):
         f.write(log_content)
     
     # Clean up old logs if over limit
-    log_files = sorted(glob.glob(os.path.join(".\\logs", "*.txt")), key=os.path.getmtime)
+    log_files = sorted(glob.glob(os.path.join("./logs", "*.txt")), key=os.path.getmtime)
     max_logs = log_file_limit or 50
     while len(log_files) > max_logs:
         try:
