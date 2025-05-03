@@ -1,7 +1,8 @@
 {
     "files.associations": {
       "**/models_fallback_rules.json": "jsonc",
-      "**/providers.json": "jsonc"
+      "**/providers.json": "jsonc",
+      "**/models_fallback_rules.*.json": "jsonc",
     },
     "python.analysis.extraPaths": [
       "./middleware"

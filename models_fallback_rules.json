@@ -1,158 +1,42 @@
 [
     {
-        "gateway_model_name": "llmgateway/free-stack",        
+        "gateway_model_name": "llmgateway/free-stack", // this gateway model to be referenced
+        "rotate_models" : "false", // no rotation, always starts with the first model and falls back to the rest in case of failure
         "fallback_models" :
         [
-            {   // CodIndex: 55 // Context: 1M/65k // Free // Vision support
-                "provider": "openrouter",
-                "model" : "google/gemini-2.5-pro-exp-03-25",
-                "providers_order" : ["Google AI Studio"]
-            },
-            {   // CodIndex: 49 // Context: 164k // Free // No vision support
+            { 
                 "provider": "openrouter",
                 "model" : "deepseek/deepseek-r1:free",
-                "providers_order" : ["Chutes", "Targon"]
-            },
-            {   // CodIndex: 49 // Context: 164k // Free // No vision support
-                "provider": "openrouter",
-                "model" : "deepseek/deepseek-r1-zero:free",
-                "providers_order" : ["Chutes"]
-            },
-            {   // CodIndex: 38 // Context: 164k // Free // No vision support
-                "provider": "openrouter",
-                "model" : "deepseek/deepseek-chat-v3-0324:free",
+                "retry_delay" : 15,     // retry delay in seconds for this model in case of failure
+                "retry_count" : 3,      // how many times to retry
                 "providers_order" : ["Chutes", "Targon"]
             },
             {
                 "provider": "requesty",
                 "model" : "google/gemini-2.5-pro-exp-03-25"
-            }
-        ]                    
-    },
-    {
-        "gateway_model_name": "llmgateway/free-stack-02",
-        "rotate_models": false,
-        "fallback_models" :
-        [            
-            {   // CodIndex: 38 // Context: 164k // Free // No vision support
+            },
+            {
                 "provider": "openrouter",
                 "model" : "deepseek/deepseek-chat-v3-0324:free",
-                "providers_order" : ["Chutes", "Targon"]
-            },
-            {    // CodIndex: 27 // Context: 1M // Free // support vision
-                "provider": "openrouter",
-                "model" : "google/gemini-2.0-flash-exp:free"                
-            },
-            {   // CodIndex: 49 // Context: 164k // Free // No vision support
-                "provider": "openrouter",
-                "model" : "deepseek/deepseek-r1-zero:free",
-                "providers_order" : ["Chutes", "Targon"]
+                "use_provider_order_as_fallback": true, // use providers_order as fallback
+                "providers_order" : ["Chutes", "Targon"] // if use_provider_order_as_fallback is true, this will be used as fallback one by one
             }
         ]                    
     },
     {
-        "gateway_model_name": "llmgateway/ultra-cheap",
-        "rotate_models": false,
-        "fallback_models" :
-        [   
-            { // CodIndex: 51 // Context: 131k // Fireworks (input: $0,10  output: $0,10), Novita (input: $0,20  output: $0,80) // No vision support
-                "provider": "openrouter",
-                "model" : "qwen/qwen3-235b-a22b",
-                "providers_order" : ["Fireworks", "Novita"]
-            },
-            { // CodIndex: 30// // Context: 1M // Google (input: $0,15  output: $0,60) // supports vision
-                "provider": "openrouter",
-                "model" : "google/gemini-2.5-flash-preview"
-            },
-            {// CodIndex: 29 // Context: 1M // OpenAI (input: $0,10  output: $0,40) // supports vision
-                "provider": "openrouter",
-                "model" : "openai/gpt-4.1-nano"                
-            }
-            // { // The streaming of this model is behaving badly. Do not use it for now.
-            //     // CodIndex: (reasonsing low=??, high=55) / xAI (input: $0,30  output: $0,50) // no vision support
-            //     "provider": "openrouter",
-            //     "model" : "x-ai/grok-3-mini-beta",
-            //     "providers_order" : ["xAI"]
-            //     }
-            // }
-        ]                    
-    },    
-    {
-        "gateway_model_name": "llmgateway/ultra-cheap-vision",
-        "rotate_models": false,
-        "fallback_models" :
-        [   
-            { // CodIndex: 30 // Context: 1M // Google (input: $0,15  output: $0,60) // supports vision
-                "provider": "openrouter",
-                "model" : "google/gemini-2.5-flash-preview"
-            },
-            {// CodIndex: 29 // Context: 1M // OpenAI (input: $0,10  output: $0,40) // supports vision
-                "provider": "openrouter",
-                "model" : "openai/gpt-4.1-nano"                
-            }
-        ]                    
-    },    
-    {
-        "gateway_model_name": "llmgateway/cheap",
-        "rotate_models": false,
-        "fallback_models" :
-        [    
-            {// CodIndex: 44 // Context: 1M // Google (input: $0,40  output: $1,60)
-                "provider": "openrouter",
-                "model" : "openai/gpt-4.1-mini"                
-            },        
-            { // CodIndex: 43 // Context: 1M // Google (input: $0,15  output: $3,50)
-                "provider": "openrouter",
-                "model" : "google/gemini-2.5-flash-preview:thinking"
-            }
-        ]                    
-    },
-    {
-        "gateway_model_name": "llmgateway/deepseek-v3.1",
-        "rotate_models" : "true",
+        "gateway_model_name": "llmgateway/deepseek-v3.1", 
+        "rotate_models" : "true",  // When true, gatweway will rotate through models between requests. Retry is ignored in this mode.
         "fallback_models" :
         [
             {
                 "provider": "openrouter",
                 "model" : "deepseek/deepseek-chat-v3-0324",
-                "providers_order" : ["DeepInfra", "Lambda", "Nebius AI Studio"]
+                "providers_order" : ["Lambda", "DeepInfra", "Nebius AI Studio"]
             },
             {
                 "provider": "nebius",
                 "model": "deepseek-ai/DeepSeek-V3-0324"
-            },
-            {
-                "provider": "together",
-                "model" : "deepseek-ai/DeepSeek-V3"
-            },
-            {
-                "provider": "klusterai",
-                "model" : "deepseek-ai/DeepSeek-V3"
-            },
-            {
-                "provider": "requesty",
-                "model" : "novita/deepseek/deepseek-v3-0324"
-            },
-            {
-                "provider": "requesty",
-                "model" : "nebius/deepseek-ai/DeepSeek-V3-0324"
-            }
-        ]                    
-    },
-    {
-        "gateway_model_name": "llmgateway/deepseek-R1",
-        "use_provider_order_as_fallback" : true,
-        "fallback_models" :
-        [
-            {
-                "provider": "openrouter",
-                "model" : "deepseek/deepseek-r1",
-                "providers_order" : ["Lambda", "DeepInfra", "Nebius"]
-            },
-            {
-                "provider": "requesty",
-                "model" : "minimaxi/DeepSeek-R1"           
             }
         ]                    
     }
-]
+]    

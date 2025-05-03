@@ -23,8 +23,8 @@ Use it with code agents like Cline, RooCode, or even with your applications as a
 ## Gateway endpoints
 
   - `/v1/models` - Like v1, just lists available models <br/><br/>
-  - `/v1/chat/completions` - OpenAI compatible API that routes calls to other providers with fallback in case of call failure.
-  **HOT FEATURE:** This endpoint allows you to create a sequence of fallback models to be called in case of failure, i.e., if a model response fails, it automatically calls the next in the fallback sequence and so on. The model's sequence can consist of different models and different providers. For example, the first model in the sequence is deepseek-chat from OpenRouter; we can configure the gateway to fall back to gpt-4o in OpenAI in case of failure. This fallback sequence can be of any size and must be configured in the file **models_fallback_rules.json**.
+  - `/v1/chat/completions` - OpenAI compatible API that routes calls to other providers with fallback in case of call failure.<br><br>
+  **HOT FEATURE:**: This endpoint allows you to create a sequence of fallback models to be called in case of failure, with support for retries. For example, if a model response fails, the gateway can retry the same model or automatically move to the next model in the fallback sequence, and so on. The model's sequence can consist of different models and different providers. For instance, the first model in the sequence could be deepseek-chat from OpenRouter, and the gateway can be configured to fall back to gpt-4o from OpenAI in case of failure. This fallback sequence can be of any size and must be configured in the file `models_fallback_rules.json`.
 
 ## Configuration
 
@@ -103,19 +103,21 @@ The `apikey` fields are keys to the environment variables with the actual key va
 ### Fallback Rules JSON Example (`models_fallback_rules.json`):
 
 #### Simple fallback 
-In this mode (`rotate_models=false`), the gateway always starts with the first model in each request and falls back to the next ones in case of failures.
+In this mode (`rotate_models=false`), the gateway always starts with the first model in each request and falls back to the next ones in case of failures.<br>
+Retries can be also configured for each model.
 ```json
 [
     {
-        // an example of only free models which we'll call "llmgateway/free-stack"
-        "gateway_model_name": "llmgateway/free-stack",
-        "rotate_models": false,  // no rotation, always starts with the first model and falls back to the rest if needed
+        "gateway_model_name": "llmgateway/free-stack", // this gateway model to be referenced
+        "rotate_models" : "false", // no rotation, always starts with the first model and falls back to the next in case of failure
         "fallback_models" :
         [
-            {
+            { 
                 "provider": "openrouter",
-                "model" : "google/gemini-2.5-pro-exp-03-25",
-                "providers_order" : ["Google AI Studio"]
+                "model" : "deepseek/deepseek-r1:free",
+                "retry_delay" : 15,     // retry delay in seconds for this model in case of failure
+                "retry_count" : 3,      // how many times to retry
+                "providers_order" : ["Chutes", "Targon"]
             },
             {
                 "provider": "requesty",
@@ -124,8 +126,8 @@ In this mode (`rotate_models=false`), the gateway always starts with the first m
             {
                 "provider": "openrouter",
                 "model" : "deepseek/deepseek-chat-v3-0324:free",
-                "use_provider_order_as_fallback": true, // use only the first provider and falls back to the next ones only in case of failure
-                "providers_order" : ["Chutes", "Targon"]
+                "use_provider_order_as_fallback": true, // use providers_order as fallback
+                "providers_order" : ["Chutes", "Targon"] // if use_provider_order_as_fallback is true, this will be used as fallback one by one
             }
         ]                    
     }
@@ -139,7 +141,7 @@ In this mode (`rotate_models=true`), the gateway cycles through all models betwe
     {
         // an example of a model that exists in various providers
         "gateway_model_name": "llmgateway/deepseek-v3.1", 
-        "rotate_models": true,  // When true, gatweway will rotate through models between requests.
+        "rotate_models": true,  // When true, gatweway will rotate through models between requests. Retry is ignored in this mode
         "fallback_models" :
         [
             {
