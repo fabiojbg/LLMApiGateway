@@ -17,7 +17,10 @@ class FallbackModelRule(BaseModel):
     model: str
     use_provider_order_as_fallback: bool = False
     providers_order: Optional[List[str]] = None
-    additional_payload_params: Dict[str, Any] = Field(default_factory=dict)
+    retry_delay: Optional[int] = None
+    retry_count: Optional[int] = None
+    custom_body_params: Dict[str, Any] = Field(default_factory=dict)
+    custom_headers: Dict[str, Any] = Field(default_factory=dict)
 
 class ModelFallbackConfig(BaseModel):
     gateway_model_name: str

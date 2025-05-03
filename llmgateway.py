@@ -167,14 +167,14 @@ async def chat_completions(request: Request):
         reordered_sequence = model_fallbacks_sequence[start_index:] + model_fallbacks_sequence[:start_index]
         model_fallbacks_sequence = reordered_sequence
 
-
     # 2. Iterate Through Providers and Attempt Requests
     last_error_detail = "No providers were attempted."
     for model_fallback_rule in model_fallbacks_sequence:
-
         # Access dictionary keys instead of attributes for fallback rules
         provider_name = model_fallback_rule["provider"]
         provider_model = model_fallback_rule["model"]
+        retry_delay = model_fallback_rule.get("retry_delay")
+        retry_count = model_fallback_rule.get("retry_count") or 0
         subproviders_ordering = model_fallback_rule.get("providers_order") # Use .get() for optional field
 
         logging.info(f"------------ ATTEMPTING MODEL: {provider_model} in {provider_name} and subproviders ordering: {subproviders_ordering}")
@@ -213,73 +213,80 @@ async def chat_completions(request: Request):
         if custom_headers:
             for key, value in custom_headers.items():
                 headers[key] = value
-        
-        # Case 1: Provider with sub-provider ordering (e.g., OpenRouter). Call each sub-provider in order instead of letting this to openrouter
-        if subproviders_ordering and len(subproviders_ordering) > 0 and model_fallback_rule["use_provider_order_as_fallback"]== True: 
-            logging.info(f"Provider '{provider_name}' uses sub-provider ordering. Target model: {provider_model}. Order: {subproviders_ordering}")
+                
+        while retry_count >= 0:
+            # Case 1: Standard Provider (or fallback)
+            if not subproviders_ordering or len(subproviders_ordering) <= 0 or model_fallback_rule["use_provider_order_as_fallback"]== False: 
+                logging.info(f"Attempting standard provider '{provider_name}' with target model: {provider_model}")
+                
+                payload = copy.deepcopy(request_body_json)
+                payload["model"] = provider_model # real provider model name                
             
-            for sub_provider in subproviders_ordering:
-                logging.info(f"Attempting sub-provider: {sub_provider} via {provider_name} for {provider_model}")
-
-                # Add provider ordering info to the request (specific to providers like OpenRouter)
-                if provider_name == "openrouter":
-                    payload["provider"] = {"order": [sub_provider]} # Assuming it goes in the body based on old v1 logic
-                    payload["allow_fallbacks"] = False
-
-                # Make the request for this specific sub-provider                
+                if provider_name == "openrouter" :
+                    if subproviders_ordering and len(subproviders_ordering) > 0:
+                        payload["provider"] = {"order": subproviders_ordering} 
+                        payload["allow_fallbacks"] = False
+                        
+                # Make the request
                 response_data, error_detail = await LLMRequest.execute(client, target_url, headers, payload, is_streaming)
                 #response_data = None # for debugging only
                 #error_detail = 'test error' # for debugging only
 
                 if response_data and error_detail is None:
-                    logging.info(f"Connection success with model '{provider_model}' from provider '{provider_name}' via '{sub_provider}'. Starting streaming response...")
+                    logging.info(f"Connection success with provider '{provider_name}' for model '{provider_model}'. Starting streaming response...")
                     return response_data # Success! Return the response.
                 else:
-                    logging.warning(f"--------------- MODEL FAILURE ({provider_model})---------------")
                     payload["messages"] = "<REMOVED>" # Remove messages from payload for logging
-                    logging.warning(f"Failed attempt with sub-provider '{sub_provider}' via '{provider_name}'. Error: {error_detail}")
-                    logging.warning(f"Failed attempt with model '{provider_model}' via '{provider_name}' and subprovider '{sub_provider}'.\r\n" \
+                    logging.warning(f"Failed attempt with model '{provider_model}' via '{provider_name}'.\r\n" \
                                     f"Error: {error_detail}\r\n" \
                                     f"Target Url: {target_url}\r\n" \
                                     f"Payload: {payload}")
-                    
-                    last_error_detail = f"Failed attempt with sub-provider '{sub_provider}' via '{provider_name}'. Error: {error_detail}"
-                    # Continue to the next sub-provider in the inner loop
+                    last_error_detail = f"Provider '{provider_name}' failed: {error_detail}"
+                    logging.debug(f"Continuing to next main provider after standard attempt failed for '{provider_name}'.") # Added log
 
-            # If all sub-providers failed, continue to the next main provider in the outer loop
-            logging.warning(f"All sub-providers for '{provider_name}' failed.")
-            continue
-
-        # Case 2: Standard Provider (or fallback)
-        else:
-            logging.info(f"Attempting standard provider '{provider_name}' with target model: {provider_model}")
-            
-            payload = copy.deepcopy(request_body_json)
-            payload["model"] = provider_model # real provider model name                
-           
-            if provider_name == "openrouter" :
-                if subproviders_ordering and len(subproviders_ordering) > 0:
-                    payload["provider"] = {"order": subproviders_ordering} 
-                    payload["allow_fallbacks"] = False
-                      
-            # Make the request
-            response_data, error_detail = await LLMRequest.execute(client, target_url, headers, payload, is_streaming)
-            #response_data = None # for debugging only
-            #error_detail = 'test error' # for debugging only
-
-            if response_data and error_detail is None:
-                logging.info(f"Connection success with provider '{provider_name}' for model '{provider_model}'. Starting streaming response...")
-                return response_data # Success! Return the response.
+            # Case 2: Use each subprovider as a fallback for the model (don't use openrouter fallback
             else:
-                payload["messages"] = "<REMOVED>" # Remove messages from payload for logging
-                logging.warning(f"Failed attempt with model '{provider_model}' via '{provider_name}'.\r\n" \
-                                f"Error: {error_detail}\r\n" \
-                                f"Target Url: {target_url}\r\n" \
-                                f"Payload: {payload}")
-                last_error_detail = f"Provider '{provider_name}' failed: {error_detail}"
-                logging.debug(f"Continuing to next main provider after standard attempt failed for '{provider_name}'.") # Added log
-                # Continue to the next provider in the outer loop
-                continue
+                logging.info(f"Provider '{provider_name}' uses sub-provider ordering. Target model: {provider_model}. Order: {subproviders_ordering}")
+                
+                for sub_provider in subproviders_ordering:
+                    logging.info(f"Attempting sub-provider: {sub_provider} via {provider_name} for {provider_model}")
+
+                    # Add provider ordering info to the request (specific to providers like OpenRouter)
+                    if provider_name == "openrouter":
+                        payload["provider"] = {"order": [sub_provider]} # Assuming it goes in the body based on old v1 logic
+                        payload["allow_fallbacks"] = False
+
+                    # Make the request for this specific sub-provider                
+                    response_data, error_detail = await LLMRequest.execute(client, target_url, headers, payload, is_streaming)
+                    #response_data = None # for debugging only
+                    #error_detail = 'test error' # for debugging only
+
+                    if response_data and error_detail is None:
+                        logging.info(f"Connection success with model '{provider_model}' from provider '{provider_name}' via '{sub_provider}'. Starting streaming response...")
+                        return response_data # Success! Return the response.
+                    else:
+                        logging.warning(f"--------------- MODEL FAILURE ({provider_model})---------------")
+                        payload["messages"] = "<REMOVED>" # Remove messages from payload for logging
+                        logging.warning(f"Failed attempt with sub-provider '{sub_provider}' via '{provider_name}'. Error: {error_detail}")
+                        logging.warning(f"Failed attempt with model '{provider_model}' via '{provider_name}' and subprovider '{sub_provider}'.\r\n" \
+                                        f"Error: {error_detail}\r\n" \
+                                        f"Target Url: {target_url}\r\n" \
+                                        f"Payload: {payload}")
+                        
+                        last_error_detail = f"Failed attempt with sub-provider '{sub_provider}' via '{provider_name}'. Error: {error_detail}"
+                        # Continue to the next sub-provider in the inner loop
+
+                # If all sub-providers failed, continue to the next main provider in the outer loop
+                logging.warning(f"All sub-providers for '{provider_name}' failed.")
+
+            if rotate_models: # do not retry if model rotation is enabled
+                retry_count = 0
+            else:
+                if retry_count > 0 and retry_delay>0 and retry_delay<120:
+                    logging.info(f"RETRYING {provider_model} in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+            retry_count -= 1
+            
 
     # 3. If all providers failed
     logging.error(f"All providers failed for model '{requested_model}'. Last error: {last_error_detail}")
