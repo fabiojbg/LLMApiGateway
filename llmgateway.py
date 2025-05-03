@@ -284,7 +284,7 @@ async def chat_completions(request: Request):
             else:
                 if retry_count > 0 and retry_delay>0 and retry_delay<120:
                     logging.info(f"RETRYING {provider_model} in {retry_delay} seconds...")
-                await asyncio.sleep(retry_delay)
+                    await asyncio.sleep(retry_delay)
             retry_count -= 1
             
 
