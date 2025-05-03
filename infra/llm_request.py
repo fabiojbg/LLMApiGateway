@@ -39,13 +39,13 @@ class LLMRequest:
 
                                 # Check if this chunk should be ignored for 'first chunk' error check
                                 if chunk_str.startswith(":"): # stream comment -> ignore
-                                    logging.debug(f"Ignoring comment chunk for first_chunk check: {chunk_str[:100]}...")
+                                    logging.debug(f"Ignoring comment chunk for first_chunk check: {chunk_str[:1000]}...")
                                     continue # Process next chunk
 
                                 # If it's not an ignored chunk AND we are still looking for the first *real* chunk
                                 if looking_first_chunk:
                                     looking_first_chunk = False # Mark that we've found the first *real* chunk
-                                    logging.debug(f"Processing first *real* chunk from {target_url}: {chunk_str[:100]}...")
+                                    logging.debug(f"Processing first *real* chunk from {target_url}: {chunk_str[:1000]}...")
                                     has_error = None
                                     # Check for errors within the first stream chunk (e.g., OpenRouter error format)
                                     if chunk_str.startswith("data:"):
@@ -91,11 +91,11 @@ class LLMRequest:
                 async def combined_generator():
                     nonlocal error_in_stream, error_detail # Ensure error_detail can be modified
                     if not looking_first_chunk and not error_in_stream: # first_chunk is False if priming succeeded
-                        logging.debug(f"Yielding first chunk from {target_url}: {first_yield[:400]}...")  
+                        logging.debug(f"Yielding first chunk from {target_url}: {first_yield[:1000]}...")  
                         yield first_yield
 
                     async for chunk in gen:
-                        logging.debug(f"Yielding chunk from {target_url}: {chunk[:400]}...")  
+                        logging.debug(f"Yielding chunk from {target_url}: {chunk[:1000]}...")  
                         try:
                             chunk_str = chunk.decode('utf-8')
                             # Check for errors within the stream (e.g., OpenRouter error format)
@@ -107,16 +107,14 @@ class LLMRequest:
                                 except Exception as json_parse_exception:
                                     logging.warning(f"Failed to parse potential error JSON: {json_parse_exception}.")
                                 if has_error:
-                                    logging.error(f"--------------- CHUNK ERROR ----------------------")
+                                    logging.error(f"--------------- CHUNK ERROR IN THE MIDDLE OF STREAMING-------------------")
                                     logging.error(f"Error detected in stream chunk from {target_url}: {error_detail_json}")
                                     error_in_stream = True
-                                    # Don't yield the error chunk itself, let the calling function handle the error signal
-                                    return # Stop the generator on error
+                                    error_detail = error_detail_json
                         except UnicodeDecodeError:
                             logging.warning(f"Could not decode chunk from {target_url} as UTF-8 during combined generation.")
-                            pass
 
-                            yield chunk 
+                        yield chunk 
 
                 # After the combined_generator finishes (or is stopped by return), check error_in_stream
                 # This check seems redundant here as errors should be handled by returning None, error_detail below

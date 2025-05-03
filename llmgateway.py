@@ -95,8 +95,8 @@ async def get_models():
                 if model["id"] not in [m["id"] for m in response["data"]]:
                     response["data"].append(model)
         except json.JSONDecodeError as json_err:
-            logging.error(f"Invalid JSON response from {target_url}: {response_from_fallback.text[:100]}...")
-            raise HTTPException(status_code=500, detail=f"Invalid JSON response from {target_url}: {response_from_fallback.text[:100]}...")
+            logging.error(f"Invalid JSON response from {target_url}: {response_from_fallback.text[:1000]}...")
+            raise HTTPException(status_code=500, detail=f"Invalid JSON response from {target_url}: {response_from_fallback.text[:1000]}...")
 
         return response
     except httpx.HTTPStatusError as e:
@@ -118,7 +118,7 @@ async def chat_completions(request: Request):
         request_body_json = json.loads(request_body_bytes.decode('utf-8'))
         
         payload_to_log = copy.deepcopy(request_body_json)
-        payload_to_log["messages"] = "<REMOVED>" # Remove messages from payload for logging
+        #payload_to_log["messages"] = "<REMOVED>" # Remove messages from payload for logging
         logging.debug(f"/v2/chat/completions: Request for model \'{payload_to_log['model']}\'. Payload: {payload_to_log}") # Log the payload without messages
     except json.JSONDecodeError:
         logging.error("Failed to decode request body JSON", exc_info=True)
