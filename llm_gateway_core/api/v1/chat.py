@@ -1,112 +1,29 @@
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-import httpx
-import os
-from typing import Optional
 import logging
-from logging.config import dictConfig
-from pydantic import BaseModel
-from middleware.logging import log_middleware
-from middleware.chat_logging import log_chat_completions
-from middleware.auth import api_key_auth
-from log_config import configure_logging
-from settings import settings
 import json5
-from pathlib import Path
-import sys
-import asyncio # Added for potential delays/retries if needed later
-import copy # Added for deep copying request body
-from db.model_rotation import ModelRotationDB
-from llm_request import make_llm_request
-from config_loader import ConfigLoader
+import copy
+import asyncio
+import os
+from fastapi import APIRouter, Request, HTTPException
+from fastapi.responses import StreamingResponse
 
-# Initialize logging
-configure_logging() # Ensure logging is configured before first use
+# Relative imports from the new structure
+from ...config.loader import ConfigLoader
+from ...config.settings import settings
+from ...db.model_rotation_db import ModelRotationDB
+from ...services.request_handler import make_llm_request
 
-# Initialize model rotation database
-model_rotation_db = ModelRotationDB()
+logger = logging.getLogger(__name__)
 
-# Load models fallback rules from JSON file
+# Initialize dependencies needed for this router
+# These might be better handled via dependency injection in a more complex setup
 config_loader = ConfigLoader()
 providers_config = config_loader.load_providers()
 fallback_rules = config_loader.load_fallback_rules()
-   
-# Initialize FastAPI
-app = FastAPI()
+model_rotation_db = ModelRotationDB() # Instantiate DB access
 
-# Add middleware
-app.middleware("http")(log_middleware)
-app.middleware("http")(api_key_auth)
-if settings.log_chat_messages:
-    app.middleware("http")(log_chat_completions)
+router = APIRouter()
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# HTTP client
-# Increased default timeout
-client = httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=60.0)) 
-
-@app.get("/v1/models")
-async def get_models(): 
-    """Returns the list of models available in the gateway with the models in the fallback provider"""
-    try:
-        response = {}
-        response["object"] = "list"
-        response["data"] = [{"id": model_name, "object": "model", "owned_by": "llmgateway"} for model_name in fallback_rules.keys()]
-        
-        # call fallback provider /models and append it to the response
-        fallback_provider_name = settings.fallback_provider
-        fallback_provider_config = providers_config.get(fallback_provider_name)
-        fallback_provider_base_url = fallback_provider_config.get("baseUrl")
-        fallback_provider_api_key_env_var = fallback_provider_config.get("apikey")
-        fallback_provider_api_key = os.getenv(fallback_provider_api_key_env_var)
-        headers = {
-            "Content-Type": "application/json",
-            **({"Authorization": f"Bearer {fallback_provider_api_key}"} if fallback_provider_api_key else {})
-        }
-        target_url = f"{fallback_provider_base_url.rstrip('/')}/models"
-        logging.info(f"Calling fallback provider '{fallback_provider_name}' for models list from {target_url}")
-        response_from_fallback = await client.get(target_url, headers=headers, timeout=None)
-        if response_from_fallback.status_code >= 400:
-            logging.warning(f"Downstream error {response_from_fallback.status_code} from {target_url}: {response_from_fallback.text}")
-            raise HTTPException(status_code=response_from_fallback.status_code, detail=response_from_fallback.text)
-        #continue if no error
-        try:
-            response_from_fallback_json = response_from_fallback.json()
-            if "error" in response_from_fallback_json or "detail" in response_from_fallback_json:
-                error_detail = response_from_fallback_json.get("error", {}).get("message") or response_from_fallback_json.get("detail")
-                logging.warning(f"Error detected in non-stream response from {target_url}: {error_detail}")
-                raise HTTPException(status_code=500, detail=error_detail)
-            # Append the models from the fallback provider to the response
-            for model in response_from_fallback_json["data"]:
-                if model["id"] not in [m["id"] for m in response["data"]]:
-                    response["data"].append(model)
-        except json5.JSONDecodeError as json_err:
-            logging.error(f"Invalid JSON response from {target_url}: {response_from_fallback.text[:1000]}...")
-            raise HTTPException(status_code=500, detail=f"Invalid JSON response from {target_url}: {response_from_fallback.text[:1000]}...")
-
-        return response
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(
-            status_code=e.response.status_code,
-            detail=e.response.text
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
-
-# --- V2 Endpoint ---
-@app.post("/v1/chat/completions")
+@router.post("/completions")
 async def chat_completions(request: Request):
     try:
         request_body_bytes = await request.body()
@@ -115,9 +32,6 @@ async def chat_completions(request: Request):
         payload_to_log = copy.deepcopy(request_body_json)
         payload_to_log["messages"] = "<REMOVED>" # Remove messages from payload for logging
         logging.debug(f"/v1/chat/completions: Request for model \'{payload_to_log['model']}\'. Payload: {payload_to_log}") # Log the payload without messages
-    except json5.JSONDecodeError:
-        logging.error("Failed to decode request body JSON", exc_info=True)
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
     except Exception as e:
         logging.error(f"Error reading request body: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=f"Error reading request body: {str(e)}")
@@ -186,6 +100,8 @@ async def chat_completions(request: Request):
 
         headers = {
             "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/fabiojbg/LLMApiGateway",
+            "X-Title": "LLMGateway",
             # Add Authorization header only if api_key is present
             **({"Authorization": f"Bearer {provider_api_key}"} if provider_api_key else {})
         }
@@ -208,7 +124,7 @@ async def chat_completions(request: Request):
                 #error_detail = 'test error' # for debugging only
 
                 if response_data and error_detail is None:
-                    logging.info(f"Connection success with model '{provider_model}' in provider '{provider_name}'. Starting streaming response...")
+                    logging.info(f"Connection success to model '{provider_model}' in provider '{provider_name}'. Starting streaming response...")
                     return response_data # Success! Return the response.
                 else:
                     payload["messages"] = "<REMOVED>" # Remove messages from payload for logging
@@ -216,8 +132,8 @@ async def chat_completions(request: Request):
                                     f"Error: {error_detail}\r\n" \
                                     f"Target Url: {target_url}\r\n" \
                                     f"Payload: {payload}")
-                    last_error_detail = f"Provider '{provider_name}' failed: {error_detail}"
-                    logging.debug(f"Continuing to next main provider after attempt failed for '{provider_model}' in '{provider_name}'.") # Added log
+                    last_error_detail = f"Model {provider_model} failed with provider '{provider_name}': {error_detail}"
+                    logging.debug(f"Continuing to next provider after attempt failed for '{provider_model}' in '{provider_name}'.") # Added log
 
             # Case 2: Provider with sub-provider ordering (e.g., OpenRouter). Call each sub-provider in order instead of letting this to openrouter
             else:
@@ -238,6 +154,7 @@ async def chat_completions(request: Request):
                     #response_data = None # for debugging only
                     #error_detail = 'test error' # for debugging only
 
+                        
                     if response_data and error_detail is None:
                         logging.info(f"Connection success with model '{provider_model}' in provider '{provider_name}' via '{sub_provider}'. Starting streaming response...")
                         return response_data # Success! Return the response.
@@ -246,14 +163,14 @@ async def chat_completions(request: Request):
                                         f"Error: {error_detail}\r\n" \
                                         f"Target Url: {target_url}\r\n" \
                                         f"Payload: {payload}")
-                        last_error_detail = f"Provider '{provider_name}' failed via sub-provider {sub_provider} for model {provider_model}: {error_detail}"
+                        last_error_detail = f"Model '{provider_model}' failed from provider '{provider_name}' and sub-provider {sub_provider} : {error_detail}"
                         # Continue to the next sub-provider in the inner loop
 
                 # If all sub-providers failed, continue to the next main provider in the outer loop
                 logging.warning(f"All sub-providers for '{provider_name}' failed.")
 
             if retry_count > 0 and retry_delay>0 and retry_delay<120:
-                logging.info(f"RETRYING {provider_model} in {retry_delay} seconds...")
+                logging.info(f"RETRYING {provider_model} in {retry_delay} seconds... {retry_count-1} attempts left.")
                 await asyncio.sleep(retry_delay)
             retry_count -= 1
 
@@ -261,12 +178,7 @@ async def chat_completions(request: Request):
     logging.error(f"All providers failed for model '{requested_model}'. Last error: {last_error_detail}")
     raise HTTPException(status_code=503, detail=f"All configured providers failed for model '{requested_model}'. Last error: {last_error_detail}")
 
-if __name__ == "__main__":
-    import uvicorn
-    from settings import settings
-    uvicorn.run(
-        app, 
-        host="0.0.0.0", 
-        port=settings.gateway_port, # not working, must be defined in the command line with --port parameter
-        log_level="debug",
-    )
+# Example of how to potentially add other endpoints to this router
+# @router.get("/some_other_chat_endpoint")
+# async def some_other_chat_endpoint():
+#     return {"message": "Another chat endpoint"}

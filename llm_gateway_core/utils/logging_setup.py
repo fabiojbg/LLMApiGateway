@@ -13,14 +13,18 @@ class CustomJsonFormatter(JsonFormatter):
 
 def configure_logging():
     # Create logs directory if it doesn't exist
+    # Note: This assumes the script is run from the project root
+    # If run from within llm_gateway_core, the path might need adjustment
+    # For now, keeping it relative to the expected execution context (root)
     os.makedirs('logs', exist_ok=True)
-    
+
     dictConfig({
         'version': 1,
         'formatters': {
             'json': {
                 'fmt': '%(asctime)s %(levelname)s %(message)s',
-                '()': 'log_config.CustomJsonFormatter'
+                # Adjusted path for the custom formatter
+                '()': 'llm_gateway_core.utils.logging_setup.CustomJsonFormatter'
             }
         },
         'handlers': {
@@ -30,7 +34,7 @@ def configure_logging():
             },
             'file': {
                 'class': 'logging.handlers.RotatingFileHandler',
-                'filename': 'logs/gateway.log',
+                'filename': 'logs/gateway.log', # Path relative to project root
                 'maxBytes': 256000,
                 'backupCount': 5,
                 'formatter': 'json'
@@ -48,4 +52,3 @@ def configure_logging():
             }
         }
     })
-

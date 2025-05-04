@@ -45,11 +45,11 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
                                 first_chunk = False # Mark that we've found the first *real* chunk
                                 logging.debug(f"Processing first *real* chunk from {target_url}: {chunk_str[:1000]}...")
                                 # Check this first *real* chunk for error messages
-                                if '"error"' in chunk_str or '"detail"' in chunk_str:
+                                if '"error":' in chunk_str or '"detail"' in chunk_str:
                                      try:
                                          # Attempt to parse as JSON to get detail
                                          error_json = json5.loads(chunk_str.replace("data: ", "").strip())
-                                         error_detail = error_json.get("error", {}).get("message") or error_json.get("detail")
+                                         error_detail = str(error_json.get("error", {})) or error_json.get("detail")
                                      except Exception as json_e: # Catch specific JSON errors
                                          logging.warning(f"Failed to parse potential error JSON in first chunk: {json_e}. Falling back to raw chunk.")
                                          error_detail = chunk_str # Fallback to raw chunk

@@ -115,6 +115,7 @@ __pycache__/
 llmgateway/
 logs/
 uv.lock
+db/llmgateway_rotation.db
 
 # Spyder project settings
 .spyderproject
@@ -142,3 +143,5 @@ dmypy.json
 cython_debug/
 models_fallback_rules.mine.json
 model_rotation.sqlite
+*:Zone.Identifier
+db/llmgateway_rotation.db
