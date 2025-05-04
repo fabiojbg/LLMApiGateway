@@ -5,36 +5,38 @@
 - FastAPI (Web framework)
 - Uvicorn (ASGI server)
 - Pydantic (Configuration validation)
-- aiohttp (Async HTTP client)
+- httpx (HTTP client)
 - SQLite (Rotation state storage)
 
-## Development Setup
+## Project Structure
 ```mermaid
 graph TD
-    DEV[Developer] --> CLONE[Clone repo]
-    CLONE --> ENV[Create .env]
-    ENV --> DEPS[Install dependencies]
-    DEPS --> RUN[Start server]
-    RUN --> TEST[Test endpoints]
-    
-    subgraph Dependencies
-        DEPS --> PIP["pip install -r requirements.txt"]
-        DEPS --> UV["uv run llmgateway.py (optional)"]
-    end
+    main.py --> api/v1/chat.py
+    main.py --> api/v1/models.py
+    api/v1/chat.py --> services/request_handler.py
+    services/request_handler.py --> db/model_rotation_db.py
+    services/request_handler.py --> config/loader.py
+    config/loader.py --> providers.json
+    config/loader.py --> models_fallback_rules.json
 ```
 
-## Critical Dependencies
-- `config_loader.py`: Central configuration management
-- `llmgateway.py`: Main application entrypoint
-- `providers.json`: Provider API endpoints and headers
-- `db/model_rotation.py`: Rotation state management
+## Critical Modules
+- `main.py`: FastAPI app setup and Uvicorn runner
+- `llm_gateway_core/api/v1/`: API routers
+- `llm_gateway_core/services/request_handler.py`: Core business logic
+- `llm_gateway_core/config/loader.py`: Configuration loading
+- `llm_gateway_core/db/model_rotation_db.py`: Rotation state management
+- `providers.json`: Provider configurations
+- `models_fallback_rules.json`: Fallback rules
 
 ## API Endpoint Structure
 ```python
-@app.post("/v1/chat/completions")
+# In llm_gateway_core/api/v1/chat.py
+@router.post("/chat/completions")
 async def chat_completion(request: Request):
-    # Handler implementation
+    # Delegates to request_handler
 
-@app.get("/v1/models")
+# In llm_gateway_core/api/v1/models.py  
+@router.get("/models")
 async def list_models():
-    # Model listing logic
+    # Delegates to request_handler

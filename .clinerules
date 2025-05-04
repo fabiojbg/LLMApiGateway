@@ -13,9 +13,7 @@
 
 ## Package management
 
-- This project supports pip and uv package managers. You must mantain the requirements.txt and pyproject.toml in any change of the dependencies
-
-## Testing Standards
+- This project supports pip and uv package managers. You must mantain the requirements.txt and pyproject.toml in any change of the project dependencies
 
 ## Project Structure and Module Responsibilities
 
@@ -65,7 +63,7 @@
 └── memory-bank/            # <--- Project context files (structure unchanged)
 ```
 
-**3. Key Module Responsibilities:**
+## Key Module Responsibilities:
 
 *   **`main.py`:** Initializes the FastAPI application, includes API routers from `llm_gateway_core/api/v1/`, applies middleware from `llm_gateway_core/middleware/`, handles startup/shutdown events, and runs the Uvicorn server.
 *   **`llm_gateway_core/api/v1/chat.py`:** Defines the `APIRouter` for the `/v1/chat/completions` endpoint. Delegates request handling to `services/request_handler.py`.

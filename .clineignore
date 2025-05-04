@@ -18,3 +18,4 @@ __pycache__/
 #project dirs to ignore
 logs/
 .trae/
+db/llmgateway_rotation.db

@@ -1,30 +1,27 @@
 # System Patterns
 
-## Fallback Implementation
-```python
-def handle_chat_completion(request: ChatRequest):
-    try:
-        rule = get_fallback_rule(request.model)
-        providers = get_provider_sequence(rule, request.api_key)
-        
-        for provider_config in providers:
-            try:
-                response = call_provider(provider_config, request)
-                update_rotation_index(rule, request.api_key)
-                return response
-            except ProviderError as e:
-                log_failure(provider_config, e)
-                continue
-                
-        raise ServiceUnavailableError()
-    except Exception as e:
-        log_system_error(e)
-        raise
-```
+## Module Responsibilities
 
-## Model Rotation
-- Implemented in `db/model_rotation.py`
-- Uses SQLite database with schema:
+### API Layer (`llm_gateway_core/api/v1/`)
+- `chat.py`: Defines `/v1/chat/completions` endpoint router
+- `models.py`: Defines `/v1/models` endpoint router
+- Delegates request handling to `services/request_handler.py`
+
+### Service Layer (`llm_gateway_core/services/`)
+- `request_handler.py`: Core business logic including:
+  - Interpreting models_fallback_rules.json
+  - Managing model rotation state
+  - Determining provider attempt sequence
+  - Making httpx calls to providers
+  - Handling streaming/non-streaming responses
+  - Managing retries and fallback logic
+
+### Configuration (`llm_gateway_core/config/`)
+- `loader.py`: Loads and parses providers.json and models_fallback_rules.json
+- `settings.py`: Pydantic settings management
+
+### Database (`llm_gateway_core/db/`)
+- `model_rotation_db.py`: SQLite rotation state management with schema:
 ```sql
 CREATE TABLE IF NOT EXISTS rotation_state (
     api_key TEXT,
@@ -33,12 +30,14 @@ CREATE TABLE IF NOT EXISTS rotation_state (
     PRIMARY KEY (api_key, gateway_model)
 );
 ```
-- Increments index modulo number of fallback models
-- Reset on configuration changes
 
-## Configuration Loading
-- Hierarchical config loading:
-  1. Environment variables (.env)
-  2. providers.json
-  3. models_fallback_rules.json
-  4. Runtime overrides (future)
+### Middleware (`llm_gateway_core/middleware/`)
+- `auth.py`: Authentication middleware
+- `chat_logging.py`: Chat-specific logging
+- `request_logging.py`: General request logging
+
+## Configuration Loading Flow
+1. Environment variables (.env)
+2. providers.json (via ConfigLoader)
+3. models_fallback_rules.json (via ConfigLoader)
+4. Runtime settings (via Pydantic Settings)

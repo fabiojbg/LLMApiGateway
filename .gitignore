@@ -145,3 +145,4 @@ models_fallback_rules.mine.json
 model_rotation.sqlite
 *:Zone.Identifier
 db/llmgateway_rotation.db
+db/llmgateway_rotation.db
