@@ -7,6 +7,20 @@
         }
     },
     {
+        "openai":
+        {
+            "baseUrl" : "https://api.openai.com/v1",            
+            "apikey" : "APIKEY_OPENAI"
+        }
+    },
+    {
+        "google":
+        {
+            "baseUrl" : "https://generativelanguage.googleapis.com/v1beta/openai",            
+            "apikey" : "APIKEY_GOOGLE"
+        }
+    },
+    {
         "requesty":
         {
             "baseUrl" : "https://router.requesty.ai/v1",            
@@ -19,13 +33,6 @@
         {
             "baseUrl" : "https://api.studio.nebius.ai/v1",            
             "apikey" : "APIKEY_NEBIUS"
-        }
-    },
-    {
-        "openai":
-        {
-            "baseUrl" : "https://api.openai.com/v1",            
-            "apikey" : "APIKEY_OPENAI"
         }
     },
     {
