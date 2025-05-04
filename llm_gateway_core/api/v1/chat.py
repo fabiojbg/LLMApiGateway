@@ -118,6 +118,10 @@ async def chat_completions(request: Request):
                 payload = copy.deepcopy(request_body_json)
                 payload["model"] = provider_model # Override model if needed
 
+                if subproviders_ordering and len(subproviders_ordering) > 0:
+                    payload["provider"] = {"order": subproviders_ordering}
+                    payload["allow_fallbacks"] = False
+
                 # Make the request
                 response_data, error_detail = await make_llm_request(target_url, headers, payload, is_streaming)
                 #response_data = None # for debugging only
