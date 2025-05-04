@@ -1,6 +1,6 @@
 from fastapi import Request, HTTPException
 from fastapi.security import APIKeyHeader
-from settings import Settings
+from settings import settings
 
 api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
@@ -23,7 +23,7 @@ async def api_key_auth(request: Request, call_next):
             )
 
         # Validate API key
-        if api_key != f"Bearer {Settings.gateway_api_key}":
+        if api_key != f"Bearer {settings.gateway_api_key}":
             raise HTTPException(
                 status_code=403,
                 detail="Invalid API Key"

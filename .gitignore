@@ -114,6 +114,7 @@ pg/
 __pycache__/
 llmgateway/
 logs/
+uv.lock
 
 # Spyder project settings
 .spyderproject

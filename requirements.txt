@@ -5,3 +5,4 @@ python-dotenv==1.0.0
 python-json-logger==2.0.7
 pydantic==2.6.1
 pydantic-settings==2.2.1
+json5

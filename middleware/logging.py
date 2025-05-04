@@ -36,7 +36,7 @@ async def log_middleware(request: Request, call_next: Callable):
         raise
 
     # Handle streaming response differently
-    if isinstance(response, StreamingResponse):
+    if "StreamingResponse" in type(response).__name__ :
         return response
 
     # Log response

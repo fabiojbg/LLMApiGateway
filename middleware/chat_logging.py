@@ -3,13 +3,10 @@ import json
 import glob
 from datetime import datetime
 from pprint import pformat
+from settings import settings
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
 from typing import Callable
-from dotenv import load_dotenv
-
-load_dotenv(override=True)
-log_file_limit : int | None = int(os.getenv("LOG_FILE_LIMIT", 15))
 
 def write_log(req_headers, req_body_str, llm_response_accum):
     # Create log file with the required name format: "YY-MM-DD_HH:MM:ss:mmm.txt"
@@ -31,7 +28,7 @@ def write_log(req_headers, req_body_str, llm_response_accum):
     
     # Clean up old logs if over limit
     log_files = sorted(glob.glob(os.path.join("./logs", "*.txt")), key=os.path.getmtime)
-    max_logs = log_file_limit or 50
+    max_logs = settings.log_file_limit or 50
     while len(log_files) > max_logs:
         try:
             os.remove(log_files.pop(0))
@@ -52,34 +49,39 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
     
     response = await call_next(request)
     
-    # If response is streaming, wrap its iterator to accumulate LLM response content    
-    if "StreamingResponse" in type(response).__name__ :
+    # If response is streaming, wrap its iterator to accumulate LLM response content
+    if "StreamingResponse" in type(response).__name__ or isinstance(response, StreamingResponse):
         original_iterator = response.body_iterator
         async def accumulated_generator():
             nonlocal llm_response_accum
             async for chunk in original_iterator:
                 try:
-                    decoded_chunk = chunk.decode("utf-8")
-                    if decoded_chunk.startswith("data: "):
-                        json_part = decoded_chunk[6:].strip()
-                    else:
-                        json_part = decoded_chunk
-                    data = json.loads(json_part)
-                    if "choices" in data and isinstance(data["choices"], list):
-                        for choice in data["choices"]:
-                            if "delta" in choice and "content" in choice["delta"]:
-                                content_piece = choice["delta"]["content"]
-                                if content_piece:
-                                    llm_response_accum += content_piece
-                            else:
-                                if "message" in choice and "content" in choice["message"]:
-                                    content_piece = choice["message"]["content"]
-                                    if content_piece:
-                                        llm_response_accum += content_piece
-                    if "error" in data:
-                        llm_response_accum += decoded_chunk
-                        write_log(req_headers, req_body_str, llm_response_accum)
-                        yield chunk
+                    decoded_chunk = chunk.decode("utf-8").strip()
+                    if decoded_chunk.startswith("data: ") or decoded_chunk.startswith("{"):
+                        if decoded_chunk.startswith("{"):
+                            chunks = [decoded_chunk]
+                        else:
+                            chunks = decoded_chunk.split("data: ")
+                        for chunk_data in chunks:
+                            try:
+                                data = json.loads(chunk_data.strip())
+                                if "choices" in data and isinstance(data["choices"], list):
+                                    for choice in data["choices"]:
+                                        if "delta" in choice and "content" in choice["delta"]:
+                                            content_piece = choice["delta"]["content"]
+                                            if content_piece:
+                                                llm_response_accum += content_piece
+                                        else:
+                                            if "message" in choice and "content" in choice["message"]:
+                                                content_piece = choice["message"]["content"]
+                                                if content_piece:
+                                                    llm_response_accum += content_piece
+
+                                if "error" in data:
+                                    llm_response_accum += decoded_chunk
+                                    write_log(req_headers, req_body_str, llm_response_accum)
+                            except:
+                                pass
                 except Exception:
                     pass
                 yield chunk

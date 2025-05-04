@@ -5,8 +5,8 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field, ValidationError, field_validator
-from settings import Settings
-from config import configure_logging
+from settings import settings
+from log_config import configure_logging
 
 class ProviderDetails(BaseModel):
     baseUrl: str
@@ -76,7 +76,7 @@ class ConfigLoader:
 
     def _validate_providers(self):
         """Performs post-load validation on provider configurations."""
-        fallback_provider_name = Settings.fallback_provider
+        fallback_provider_name = settings.fallback_provider
         if fallback_provider_name not in self.providers_config:
             logging.error(f"Fallback provider '{fallback_provider_name}' defined in settings not found in providers configuration.")
             sys.exit(1)

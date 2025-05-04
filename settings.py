@@ -11,4 +11,4 @@ class Settings(BaseSettings):
     provider_injection_enabled: bool = os.getenv("PROVIDER_INJECTION_ENABLED", "true").lower() == "true"
     log_chat_messages: bool = os.getenv("LOG_CHAT_ENABLED", "true").lower() == "true"
     
-Settings = Settings()
+settings = Settings()
