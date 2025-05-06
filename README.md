@@ -34,9 +34,9 @@ cp .env.example .env
 ```
 >[!IMPORTANT]
 >These are the files you will have to prepare before use:<br>
->`.env` - main configurations and api keys<br>
+>`.env` - main configurations and API keys<br>
 > `providers.json` - configure your providers. A lot is already set here<br>
-> `models_fallback_rules.json` - the main magic happens here. Set the gateway models with its rules. See the examples in the sections below<br>
+> `models_fallback_rules.json` - the main magic happens here. Set the gateway models with their rules. See the examples in the sections below<br>
 
 
  **.env** configuration example:
