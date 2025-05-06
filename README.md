@@ -124,7 +124,7 @@ Retries can be also configured for each model.
                 "model" : "deepseek/deepseek-r1:free",
                 "retry_delay" : 15,     // retry delay in seconds for this model in case of failure
                 "retry_count" : 3,      // how many times to retry
-                "providers_order" : ["Chutes", "Targon"]
+                "providers_order" : ["Chutes", "Targon"] // Force provider order in openrouter for this model
             },
             {
                 "provider": "requesty",
