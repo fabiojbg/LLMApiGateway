@@ -21,6 +21,13 @@
         }
     },
     {
+        "xAI":
+        {
+            "baseUrl" : "https://api.x.ai/v1",
+            "apikey" : "APIKEY_XAI"
+        }
+    },
+    {
         "requesty":
         {
             "baseUrl" : "https://router.requesty.ai/v1",            

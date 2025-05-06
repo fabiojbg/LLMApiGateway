@@ -32,8 +32,15 @@ Create a `.env` file from the example .env.example:
 ```bash
 cp .env.example .env
 ```
+>[!IMPORTANT]
+>These are the files you will have to prepare before use:<br>
+>`.env` - main configurations and api keys<br>
+> `providers.json` - configure your providers. A lot is already set here<br>
+> `models_fallback_rules.json` - the main magic happens here. Set the gateway models with its rules. See the examples in the sections below<br>
+
+
  **.env** configuration example:
- ```bash
+ ```
 # This gateway must have its own API key that clients must use to access it
 # Use it in http header as "Authorization: Bearer <ThisGatewayApiKey>"
 GATEWAY_API_KEY=<ThisGatewayApiKey>
@@ -161,6 +168,33 @@ In this mode (`rotate_models=true`), the gateway cycles through all models betwe
     }
 ]    
 ```
+
+#### Custom Parameters and Headers Injection/Override
+For any model, you can inject or override custom headers or body parameters by specifing it in the rules.
+Here is an example of using grok-3-mini-beta from xAI that accepts an `reasoning_effort` parameter.
+Custom headers a also available if needed.
+```json
+[
+    {
+        // an example of a model with custom body
+        "gateway_model_name": "llmgateway/xAI", 
+        "fallback_models" :
+        [
+            {
+                "provider": "xAI",
+                "model" : "grok-3-mini-beta",                
+                "custom_body_params" : {
+                    "reasoning_effort" : "high"  // grok has this reasoning_effort parameter that can be set here
+                },
+                "custom_headers" : {
+                    "x-param" : "demo"  // custom header example
+                }
+            }
+        ]                    
+    }       
+]    
+```
+
 
 **Failover and Rotation Logic:**
 
