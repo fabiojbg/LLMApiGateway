@@ -55,7 +55,7 @@ class ConfigLoader:
             sys.exit(1)
 
         try:
-            with open(self.providers_path) as f:
+            with open(self.providers_path, 'r', encoding='utf-8') as f:
                 raw_mapping = json5.load(f)
 
             providers_config_temp = {}
@@ -96,7 +96,7 @@ class ConfigLoader:
             return {}
 
         try:
-            with open(self.fallback_rules_path) as f:
+            with open(self.fallback_rules_path, 'r', encoding='utf-8') as f:
                 raw_rules = json5.load(f)
 
             fallback_rules_temp = {}
@@ -122,6 +122,75 @@ class ConfigLoader:
             logging.error(f"Failed to load or validate '{self.fallback_rules_path.name}': {str(e)}", exc_info=True)
             sys.exit(1)
 
+    def reload_fallback_rules(self) -> bool:
+        """Reloads and validates model fallback rules from the JSON file.
+        Returns True on success, False on failure."""
+        if not self.fallback_rules_path.exists():
+            logging.error(f"Model fallback rules file not found at {self.fallback_rules_path} during reload.")
+            return False
+
+        try:
+            with open(self.fallback_rules_path, 'r', encoding='utf-8') as f:
+                raw_rules = json5.load(f)
+
+            fallback_rules_temp = {}
+            validated_rules = [ModelFallbackConfig(**item) for item in raw_rules]
+
+            for rule in validated_rules:
+                fallback_rules_temp[rule.gateway_model_name] = {
+                    "fallback_models": [fm.model_dump(exclude_none=True) for fm in rule.fallback_models],
+                    "rotate_models": rule.rotate_models
+                }
+            
+            # Perform validation before assigning to self.fallback_rules
+            # This requires a temporary way to call _validate_fallback_rules or its logic
+            # For simplicity here, we'll assume _validate_fallback_rules can be adapted or its core logic used.
+            # A more robust solution might involve passing the temporary rules to a validation method.
+            
+            # Temporarily assign to a new variable to validate
+            potential_new_rules = fallback_rules_temp
+            
+            # Validate the potential new rules (adapting _validate_fallback_rules logic)
+            if not self.providers_config:
+                 logging.warning("Providers not loaded. Cannot validate fallback rules during reload.")
+                 # Attempt to load providers if not already loaded, but don't exit on failure here.
+                 if not self.load_providers(): # Assuming load_providers could also return bool or not exit
+                     logging.error("Failed to load providers during fallback rule reload. Validation skipped.")
+                     # Decide if to proceed without validation or return False
+                     # For now, let's be strict and return False if providers can't be loaded for validation
+                     return False
+
+
+            for gateway_model_name, config in potential_new_rules.items():
+                fallback_models = config.get("fallback_models", [])
+                if not fallback_models:
+                    logging.error(f"During reload, gateway model '{gateway_model_name}' must have at least one fallback model defined.")
+                    return False
+                for fallback_model_rule in fallback_models:
+                    provider = fallback_model_rule.get("provider")
+                    model = fallback_model_rule.get("model")
+                    if not provider:
+                        logging.error(f"During reload, 'provider' is missing for a fallback rule under '{gateway_model_name}'.")
+                        return False
+                    if not model:
+                        logging.error(f"During reload, 'model' is missing for a fallback rule under '{gateway_model_name}' (provider: {provider}).")
+                        return False
+                    if provider not in self.providers_config:
+                        logging.error(f"During reload, invalid provider '{provider}' used in fallback rule for '{gateway_model_name}'. Provider not found.")
+                        return False
+
+            # If all validations pass, update the actual instance rules
+            self.fallback_rules = potential_new_rules
+            logging.info(f"Successfully reloaded and validated model fallback rules from {self.fallback_rules_path}")
+            logging.info(f"Reloaded model rules for: {list(self.fallback_rules.keys())}")
+            return True
+
+        except ValidationError as ve:
+            logging.error(f"Validation error during reload of '{self.fallback_rules_path.name}': {ve.errors()}", exc_info=True)
+            return False
+        except Exception as e:
+            logging.error(f"Failed to reload or validate '{self.fallback_rules_path.name}': {str(e)}", exc_info=True)
+            return False
 
     def _validate_fallback_rules(self):
         """Performs post-load validation on fallback rules."""

@@ -4,7 +4,7 @@
 
 ## Documentation Requirements
 
--   Keep README.md in sync with new capabilities
+-   Keep README.md and the section "Project Structure and Module Responsibilities" in this file(.clinerules) in sync with new capabilities
 
 ## Code Style & Patterns
 
@@ -40,7 +40,8 @@
 │   │   └── v1/
 │   │       ├── __init__.py
 │   │       ├── chat.py     # <--- Defines /v1/chat/completions router
-│   │       └── models.py   # <--- Defines /v1/models router
+│   │       ├── models.py   # <--- Defines /v1/models router
+│   │       └── editor.py   # <--- Defines /v1/ui/rules-editor and /v1/config/models-rules routers
 │   ├── services/           # <--- Core Business Logic
 │   │   ├── __init__.py
 │   │   └── request_handler.py # <--- Handles routing, provider calls, fallback, rotation
@@ -60,23 +61,31 @@
 │       ├── __init__.py
 │       └── logging_setup.py # <--- Logging configuration
 ├── logs/                   # <--- Runtime log files (structure unchanged)
+├── static/                 # <--- Static files for the web editor
+│   ├── editor.html         # <--- HTML for the rules editor
+│   ├── editor.css          # <--- CSS for the rules editor
+│   └── editor.js           # <--- JavaScript for the rules editor
 └── memory-bank/            # <--- Project context files (structure unchanged)
 ```
 
 ## Key Module Responsibilities:
 
-*   **`main.py`:** Initializes the FastAPI application, includes API routers from `llm_gateway_core/api/v1/`, applies middleware from `llm_gateway_core/middleware/`, handles startup/shutdown events, and runs the Uvicorn server.
+*   **`main.py`:** Initializes the FastAPI application, includes API routers from `llm_gateway_core/api/v1/` (including the editor router), applies middleware, handles startup/shutdown events (including `ConfigLoader` initialization and making it available via `app.state`), serves static files from `static/`, and runs the Uvicorn server.
 *   **`llm_gateway_core/api/v1/chat.py`:** Defines the `APIRouter` for the `/v1/chat/completions` endpoint. Delegates request handling to `services/request_handler.py`.
 *   **`llm_gateway_core/api/v1/models.py`:** Defines the `APIRouter` for the `/v1/models` endpoint. Delegates request handling to `services/request_handler.py`.
+*   **`llm_gateway_core/api/v1/editor.py`:** Defines the `APIRouter` for:
+    *   `GET /v1/ui/rules-editor`: Serves the HTML page for the `models_fallback_rules.json` editor.
+    *   `GET /v1/config/models-rules`: Fetches the current content of `models_fallback_rules.json`.
+    *   `POST /v1/config/models-rules`: Validates, saves the updated `models_fallback_rules.json`, and triggers a configuration reload via `ConfigLoader`.
 *   **`llm_gateway_core/services/request_handler.py`:** Encapsulates the core logic for handling incoming requests. This includes:
-    *   Interpreting `models_fallback_rules.json`.
+    *   Interpreting `models_fallback_rules.json` (obtained from `ConfigLoader`).
     *   Managing model rotation state using `db/model_rotation_db.py`.
     *   Determining the sequence of provider attempts (routing).
     *   Making `httpx` calls to downstream providers.
     *   Handling streaming/non-streaming responses.
     *   Managing retries and fallback logic.
     *   Fetching model lists for the `/v1/models` endpoint.
-*   **`llm_gateway_core/config/loader.py`:** Contains the `ConfigLoader` class responsible for reading and parsing `providers.json` and `models_fallback_rules.json`.
+*   **`llm_gateway_core/config/loader.py`:** Contains the `ConfigLoader` class responsible for reading, parsing, and validating `providers.json` and `models_fallback_rules.json`. Includes the `reload_fallback_rules()` method for dynamic updates of the model rules.
 *   **`llm_gateway_core/config/settings.py`:** Contains the Pydantic `Settings` class.
 *   **`llm_gateway_core/db/model_rotation_db.py`:** Contains the `ModelRotationDB` class for interacting with the SQLite database for model rotation state.
 *   **`llm_gateway_core/middleware/`:** Contains the middleware functions (authentication, chat logging, request logging).

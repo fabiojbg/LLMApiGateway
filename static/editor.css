@@ -1,0 +1,253 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f7f9;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1000px;
+    margin: 30px auto;
+    padding: 25px 25px 0px 25px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    color: #2c3e50;
+    text-align: center;
+    margin: 5px;
+    font-weight: 600;
+}
+
+p {
+    text-align: center;
+    margin: 5px;
+    color: #555;
+}
+
+code {
+    background-color: #e8eaed;
+    padding: 0.2em 0.4em;
+    margin: 0;
+    font-size: 85%;
+    border-radius: 3px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+}
+
+#editor-container {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    height: 500px; /* Default height, CodeMirror will manage its own height */
+}
+
+/* CodeMirror specific styling */
+.CodeMirror {
+    height: 500px; /* Ensure CodeMirror takes up the container height */
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+#saveButton {
+    display: block;
+    width: 100%;
+    padding: 12px 20px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+    transition: background-color 0.3s ease;
+    margin-bottom: 15px;
+}
+
+#saveButton:hover {
+    background-color: #2980b9;
+}
+
+#saveButton:active {
+    background-color: #2471a3;
+}
+
+#messageArea {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: 500;
+}
+
+#messageArea.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+#messageArea.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+#messageArea pre { /* For displaying JSON errors */
+    text-align: left;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 0.9em;
+    max-height: 200px;
+    overflow-y: auto;
+    background-color: #fff;
+    border: 1px solid #eee;
+    padding: 10px;
+}
+
+/* Theme Selector Styles */
+.controls {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Adds space between label and select */
+}
+
+.controls label {
+    font-weight: 500;
+    color: #333;
+}
+
+#themeSelector {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    min-width: 150px; /* Ensures the dropdown is not too small */
+}
+
+#themeSelector:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+/* Dark Mode Toggle Button */
+#darkModeToggle {
+    position: absolute;
+    top: 20px; /* Adjusted for better spacing */
+    right: 20px; /* Adjusted for better spacing */
+    background: none;
+    border: 1px solid #ccc; /* Subtle border */
+    color: #333; /* Icon color for light mode */
+    cursor: pointer;
+    padding: 8px; /* Slightly larger padding */
+    border-radius: 50%; /* Circular button */
+    width: 40px; /* Fixed width */
+    height: 40px; /* Fixed height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+#darkModeToggle .icon-placeholder::before {
+    content: '☀️'; /* Sun icon for light mode */
+    font-size: 20px;
+}
+
+#darkModeToggle:hover {
+    background-color: #f0f0f0; /* Light hover effect */
+}
+
+/* Dark Mode Styles */
+body.dark-mode {
+    background-color: #1e1e1e; /* Dark background for the page */
+    color: #e0e0e0; /* Light text for dark mode */
+}
+
+body.dark-mode .container {
+    background-color: #2c2c2c; /* Darker background for the container */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); /* Adjusted shadow for dark mode */
+    border: 1px solid #444; /* Subtle border for container in dark mode */
+}
+
+body.dark-mode h1 {
+    color: #e0e0e0; /* Light H1 text */
+}
+
+body.dark-mode p {
+    color: #b0b0b0; /* Lighter paragraph text */
+}
+
+body.dark-mode code {
+    background-color: #3a3a3a; /* Darker code background */
+    color: #d0d0d0; /* Lighter code text */
+}
+
+body.dark-mode #editor-container {
+    border: 1px solid #444; /* Darker border for editor container */
+}
+
+/* CodeMirror in dark mode will be handled by its own theme, but we can adjust container if needed */
+
+body.dark-mode #saveButton {
+    background-color: #007acc; /* A slightly different blue for dark mode */
+    color: #fff;
+}
+
+body.dark-mode #saveButton:hover {
+    background-color: #005fa3;
+}
+
+body.dark-mode #messageArea.success {
+    background-color: #2a3a2a; /* Darker success background */
+    color: #a7d7a7; /* Lighter success text */
+    border: 1px solid #3c5c3c;
+}
+
+body.dark-mode #messageArea.error {
+    background-color: #4a2a2a; /* Darker error background */
+    color: #f0a0a0; /* Lighter error text */
+    border: 1px solid #6c3c3c;
+}
+
+body.dark-mode #messageArea pre {
+    background-color: #333;
+    border: 1px solid #555;
+    color: #ccc;
+}
+
+body.dark-mode .controls label {
+    color: #e0e0e0; /* Light label text */
+}
+
+body.dark-mode #themeSelector {
+    background-color: #3a3a3a; /* Dark select background */
+    color: #e0e0e0; /* Light select text */
+    border: 1px solid #555; /* Darker border for select */
+}
+
+body.dark-mode #themeSelector:focus {
+    border-color: #007acc;
+    box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.3);
+}
+
+/* Dark Mode Toggle Button in Dark Mode */
+body.dark-mode #darkModeToggle {
+    background: none;
+    border: 1px solid #555; /* Darker border */
+    color: #e0e0e0; /* Icon color for dark mode */
+}
+
+body.dark-mode #darkModeToggle .icon-placeholder::before {
+    content: '🌙'; /* Moon icon for dark mode */
+}
+
+body.dark-mode #darkModeToggle:hover {
+    background-color: #3a3a3a; /* Darker hover effect */
+}

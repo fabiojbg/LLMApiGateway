@@ -22,9 +22,11 @@ Use it with code agents like Cline, RooCode, or even with your applications as a
 
 ## Gateway endpoints
 
-  - `/v1/models` - Like v1, just lists available models <br/><br/>
-  - `/v1/chat/completions` - OpenAI compatible API that routes calls to other providers with fallback in case of call failure.<br><br>
-  **HOT FEATURE:**: This endpoint allows you to create a sequence of fallback models to be called in case of failure, with support for retries. For example, if a model response fails, the gateway can retry the same model or automatically move to the next model in the fallback sequence, and so on. The model's sequence can consist of different models and different providers. For instance, the first model in the sequence could be deepseek-chat from OpenRouter, and the gateway can be configured to fall back to gpt-4o from OpenAI in case of failure. This fallback sequence can be of any size and must be configured in the file `models_fallback_rules.json`.
+  - `/v1/models` - Like v1, just lists available models.
+  - `/v1/chat/completions` - OpenAI compatible API that routes calls to other providers with fallback in case of call failure.
+  - `/v1/ui/rules-editor` - **NEW:** A web-based editor to view and modify the `models_fallback_rules.json` file directly in your browser. The editor provides syntax highlighting and validation. Upon saving, the configuration is reloaded by the gateway.
+  
+  **HOT FEATURE (Chat Completions):**: The `/v1/chat/completions` endpoint allows you to create a sequence of fallback models to be called in case of failure, with support for retries. For example, if a model response fails, the gateway can retry the same model or automatically move to the next model in the fallback sequence, and so on. The model's sequence can consist of different models and different providers. For instance, the first model in the sequence could be deepseek-chat from OpenRouter, and the gateway can be configured to fall back to gpt-4o from OpenAI in case of failure. This fallback sequence can be of any size and must be configured in the file `models_fallback_rules.json` (either manually or using the new web editor).
 
 ## Configuration
 

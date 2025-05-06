@@ -14,17 +14,21 @@ from ...services.request_handler import make_llm_request
 
 logger = logging.getLogger(__name__)
 
-# Initialize dependencies needed for this router
-# These might be better handled via dependency injection in a more complex setup
-config_loader = ConfigLoader()
-providers_config = config_loader.load_providers()
-fallback_rules = config_loader.load_fallback_rules()
+# model_rotation_db can remain as a module-level instance
 model_rotation_db = ModelRotationDB() # Instantiate DB access
 
 router = APIRouter()
 
 @router.post("/completions")
 async def chat_completions(request: Request):
+    config_loader_instance: ConfigLoader = request.app.state.config_loader
+    if not config_loader_instance:
+        logger.error("ConfigLoader not found in application state within chat_completions.")
+        # It's good practice to log this, as it indicates a setup issue in main.py or app lifecycle
+        raise HTTPException(status_code=500, detail="Internal server error: Core configuration not available.")
+    
+    providers_config = config_loader_instance.providers_config
+    fallback_rules = config_loader_instance.fallback_rules
     try:
         request_body_bytes = await request.body()
         request_body_json = json5.loads(request_body_bytes.decode('utf-8'))

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fallback Rules Editor</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
+    <!-- CodeMirror Themes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/material-darker.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/monokai.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/nord.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/eclipse.min.css">
+    <!-- Add more theme CSS links here if needed -->
+    <link rel="stylesheet" href="/static/editor.css">
+</head>
+<body>
+    <div class="container">
+        <button id="darkModeToggle" aria-label="Toggle dark mode">
+            <!-- Icon will be handled by CSS/JS -->
+            <span class="icon-placeholder"></span>
+        </button>
+        <h1>Fallback Rules Editor</h1>
+        <p>Edit the <code>models_fallback_rules.json</code> content below.</p>
+
+        <div class="controls">
+            <label for="themeSelector">Editor Theme:</label>
+            <select id="themeSelector">
+                {/* Options will be populated by JavaScript */}
+            </select>
+        </div>
+        
+        <div id="editor-container">
+            <textarea id="jsonEditor"></textarea>
+        </div>
+        
+        <button id="saveButton">Save Configuration</button>
+        <div id="messageArea"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/lint/lint.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/lint/json-lint.min.js"></script>
+    <script src="https://unpkg.com/jsonlint@1.6.3/web/jsonlint.js"></script> 
+    <script src="/static/editor.js"></script>
+</body>
+</html>

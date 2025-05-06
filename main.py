@@ -1,16 +1,20 @@
 import logging
 import uvicorn
 from fastapi import FastAPI, Request, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 # Import components from the new core structure
 from llm_gateway_core.config.settings import settings
+from llm_gateway_core.config.loader import ConfigLoader
 from llm_gateway_core.utils.logging_setup import configure_logging
 from llm_gateway_core.middleware.request_logging import RequestLoggingMiddleware # Using class-based
 from llm_gateway_core.middleware.auth import api_key_auth # Functional middleware
 from llm_gateway_core.middleware.chat_logging import log_chat_completions # Functional middleware
 from llm_gateway_core.api.v1 import router as api_v1_router
+from llm_gateway_core.api.v1.rules_editor import editor_router as api_v1_editor_router # Import the new editor router
 
 # --- Application Setup ---
 
@@ -23,7 +27,14 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Application startup...")
-    # Initialize resources here if needed
+    # Initialize ConfigLoader and load configurations
+    config_loader = ConfigLoader()
+    config_loader.load_providers()
+    config_loader.load_fallback_rules()
+    app.state.config_loader = config_loader
+    logger.info("Configurations loaded and ConfigLoader attached to app.state.")
+
+    # Initialize other resources here if needed
     # Example: await database.connect()
     yield
     logger.info("Application shutdown...")
@@ -32,6 +43,11 @@ async def lifespan(app: FastAPI):
     # Example: await http_client.aclose() # If using a shared client
 
 # Create FastAPI app instance
+# Determine project root for static files
+PROJECT_ROOT = Path(__file__).parent
+STATIC_FILES_DIR = PROJECT_ROOT / "static"
+STATIC_FILES_DIR.mkdir(parents=True, exist_ok=True) # Ensure static directory exists
+
 app = FastAPI(
     title="LLMGateway",
     description="A gateway for routing LLM requests with fallback and rotation.",
@@ -67,8 +83,14 @@ else:
 
 # --- API Routers ---
 
-# Include the v1 API router
+# Include the main v1 API router
 app.include_router(api_v1_router, prefix="/v1")
+# Include the v1 editor API router, also under /v1 prefix
+app.include_router(api_v1_editor_router, prefix="/v1", tags=["Config Editor"])
+
+# --- Static Files ---
+app.mount("/static", StaticFiles(directory=str(STATIC_FILES_DIR)), name="static")
+logger.info(f"Static files mounted from {STATIC_FILES_DIR}")
 
 # --- Basic Health Check Endpoint ---
 @app.get("/health", tags=["Health"])
