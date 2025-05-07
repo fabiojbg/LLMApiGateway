@@ -111,6 +111,9 @@ The `apikey` fields are keys to the environment variables with the actual key va
 
 ### Fallback Rules JSON Example (`models_fallback_rules.json`):
 
+>[!Note]
+> You can edit the fallback rules using web browser in `http://localhost:9000/v1/ui/ rules-editor`
+
 #### Simple fallback 
 In this mode (`rotate_models=false`), the gateway always starts with the first model in each request and falls back to the next ones in case of failures.<br>
 Retries can be also configured for each model.
