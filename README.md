@@ -46,7 +46,7 @@ cp .env.example .env
 ### Edit providers and fallback rules
 Before starting to use LLMGateway, you need to fill in your providers and models with their fallback rules by accessing the configuration page with your web browser at http://localhost:9000/v1/ui/rules-editor. Refer to the following sections to learn how to structure these rules.
 
-![Cline example](./images/config-example.png)
+![Config example](./images/config-example.png)
 
  **.env** configuration example:
  ```
