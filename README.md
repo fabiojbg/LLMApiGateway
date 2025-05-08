@@ -5,6 +5,9 @@
  <a href="https://openrouter.ai"><img alt="OpenRouter" src="https://img.shields.io/badge/OpenRouter-AI-blue?style=flat" /></a>
  &nbsp;
  <a href="https://www.paypal.com/donate/?business=G47L9N4UW8C2C&no_recurring=1&item_name=Thank+you+%21%21%21&currency_code=USD"><img alt="Download" src="https://img.shields.io/badge/Donate-😊-yellow?style=flat" /></a>
+ <br>
+ <a href="https://cline.bot/"><img alt="Cline" src="https://img.shields.io/badge/Cline-AI Coder-blue?style=flat" /></a>
+ <a href="https://roocode.com/"><img alt="RooCode" src="https://img.shields.io/badge/RooCode-AI Coder-blue?style=flat" /></a>
   
 </div>
 <br>
@@ -18,6 +21,12 @@ Use it with code agents like Cline, RooCode, or even with your applications as a
 - **Fault Tolerance**: Automatically falls back to alternative models if the primary model fails
 - **Model Rotation**: Optionally rotates through available models for each API key, distributing load and cost across providers
 - **Flexible Configuration**: Configure fallback sequences and rotation settings per model
+
+## Using with Cline
+Once set, you can use it with any local tool that supports services with OpenAI Compatible APIs, like **Cline** and **RooCode**. You just need to configure it as an OpenAI-compatible provider. Here is an example of using this gateway with Cline, set to use the model `'llmgateway/free-stack'`, which only uses models free of charge, as configured in the example above.
+
+![Cline example](./images/cline-example.png)
+
 
 ## Gateway endpoints
 
@@ -240,11 +249,3 @@ if uv is installed, simply do:
 ```bash
 uv run llmgateway.py
 ```
-
-
-## Using with Cline Example
-You can use it with Cline, RooCode, or any other code agent.
-You just need to configure it as an OpenAI-compatible provider.
-Here is an example of using this gateway with Cline, set to use the model `'llmgateway/free-stack'`, which only uses models free of charge, as configured in the example above.
-
-![Cline example](./images/cline-example.png)
