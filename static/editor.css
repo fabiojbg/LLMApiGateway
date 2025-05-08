@@ -38,11 +38,45 @@ code {
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
 }
 
-#editor-container {
+/* Tab Styles */
+.tabs {
+    display: flex;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.tab-button {
+    padding: 10px 20px;
+    cursor: pointer;
+    border: none;
+    background-color: transparent;
+    font-size: 16px;
+    font-weight: 500;
+    color: #495057;
+    border-bottom: 2px solid transparent; /* For the active indicator */
+    margin-bottom: -2px; /* Align with the container's border-bottom */
+    transition: color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+
+.tab-button:hover {
+    color: #007bff;
+}
+
+.tab-button.active {
+    color: #007bff;
+    border-bottom-color: #007bff;
+}
+
+/* Editor Content Area Styles */
+.editor-tab-content {
     border: 1px solid #ddd;
     border-radius: 5px;
     margin-bottom: 20px;
     height: 500px; /* Default height, CodeMirror will manage its own height */
+}
+
+.editor-tab-content.active {
+    display: block;
 }
 
 /* CodeMirror specific styling */
@@ -192,6 +226,28 @@ body.dark-mode code {
 body.dark-mode #editor-container {
     border: 1px solid #444; /* Darker border for editor container */
 }
+
+body.dark-mode .tabs {
+    border-bottom-color: #444;
+}
+
+body.dark-mode .tab-button {
+    color: #adb5bd;
+}
+
+body.dark-mode .tab-button:hover {
+    color: #8ab4f8; /* A light blue for hover in dark mode */
+}
+
+body.dark-mode .tab-button.active {
+    color: #8ab4f8;
+    border-bottom-color: #8ab4f8;
+}
+
+body.dark-mode .editor-tab-content {
+    border: 1px solid #444; /* Darker border for editor container */
+}
+
 
 /* CodeMirror in dark mode will be handled by its own theme, but we can adjust container if needed */
 

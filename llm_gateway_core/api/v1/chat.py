@@ -95,12 +95,12 @@ async def chat_completions(request: Request):
         provider_config = providers_config.get(provider_name)
 
         provider_base_url = provider_config.baseUrl
-        api_key_env_var = provider_config.apikey
-        provider_api_key = os.getenv(api_key_env_var)
+        api_key_env_var_or_keyvalue = provider_config.apikey
+        provider_api_key = os.getenv(api_key_env_var_or_keyvalue)
 
-        # Note: Some providers might not require a key or use other auth methods handled by headers
-        if not provider_api_key and api_key_env_var:
-             logging.warning(f"API key environment variable '{api_key_env_var}' for provider '{provider_name}' is not set. Proceeding without Authorization header.")
+        # if the key id not found in the env var, use it as a key value because user might have set it directly in the config file
+        if not provider_api_key and api_key_env_var_or_keyvalue:
+             provider_api_key = api_key_env_var_or_keyvalue
 
         headers = {
             "Content-Type": "application/json",

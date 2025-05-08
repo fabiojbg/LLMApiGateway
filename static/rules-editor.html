@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fallback Rules Editor</title>
+    <title>LLM Gateway - Configuration Editor</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
     <!-- CodeMirror Themes -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/material-darker.min.css">
@@ -20,8 +20,12 @@
             <!-- Icon will be handled by CSS/JS -->
             <span class="icon-placeholder"></span>
         </button>
-        <h1>Fallback Rules Editor</h1>
-        <p>Edit the <code>models_fallback_rules.json</code> content below.</p>
+        <h1>LLM Gateway - Configuration Editor</h1>
+
+        <div class="tabs">
+            <button id="tabRules" class="tab-button active" data-tab="rules">Fallback Rules</button>
+            <button id="tabProviders" class="tab-button" data-tab="providers">Providers</button>
+        </div>
 
         <div class="controls">
             <label for="themeSelector">Editor Theme:</label>
@@ -30,8 +34,11 @@
             </select>
         </div>
         
-        <div id="editor-container">
-            <textarea id="jsonEditor"></textarea>
+        <div id="editor-container-rules" class="editor-tab-content active">
+            <textarea id="jsonEditorRules"></textarea>
+        </div>
+        <div id="editor-container-providers" class="editor-tab-content" style="display: none;">
+            <textarea id="jsonEditorProviders"></textarea>
         </div>
         
         <button id="saveButton">Save Configuration</button>

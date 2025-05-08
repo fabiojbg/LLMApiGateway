@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, RootModel, model_validator
 
 # Import settings using relative path within the package
 from .settings import settings
@@ -14,6 +14,25 @@ from .settings import settings
 class ProviderDetails(BaseModel):
     baseUrl: str
     apikey: str
+
+class ProviderConfig(RootModel[Dict[str, ProviderDetails]]):
+    """
+    Represents a single entry in the providers.json list, 
+    which is a dictionary with one key (provider name) and ProviderDetails as value.
+    e.g., {"openai": {"baseUrl": "...", "apikey": "..."}}
+    """
+    @model_validator(mode='before')
+    @classmethod
+    def check_single_key_and_structure(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            raise ValueError("Provider entry must be a dictionary.")
+        if len(data) != 1:
+            raise ValueError("Provider entry dictionary must contain exactly one key (the provider name).")
+        
+        # Further validation of inner structure can be implicitly handled by Pydantic
+        # when it tries to match Dict[str, ProviderDetails]
+        # For example, the value associated with the key must match ProviderDetails structure.
+        return data
 
 class FallbackModelRule(BaseModel):
     provider: str
@@ -68,26 +87,48 @@ class ConfigLoader:
                 providers_config_temp[provider_name] = ProviderDetails(**provider_details_raw)
 
             self.providers_config = providers_config_temp
-            self._validate_providers() # Perform post-load validation
+            if not self._perform_provider_semantic_validation(self.providers_config, exit_on_error=True):
+                # _perform_provider_semantic_validation will log errors and sys.exit if exit_on_error is True
+                pass # Should have exited if critical error occurred
+
             logging.info(f"Successfully loaded and validated providers from {self.providers_path}")
             logging.info(f"Loaded providers: {list(self.providers_config.keys())}")
             return self.providers_config
 
         except Exception as e:
             logging.error(f"Failed to load or validate '{self.providers_path.name}': {str(e)}", exc_info=True)
-            sys.exit(1)
+            sys.exit(1) # Exit if loading fails
 
-    def _validate_providers(self):
-        """Performs post-load validation on provider configurations."""
+    def _perform_provider_semantic_validation(self, providers_to_validate: Dict[str, ProviderDetails], exit_on_error: bool = False) -> bool:
+        """
+        Performs semantic validation on a dictionary of provider configurations.
+        Checks for fallback provider existence and API key environment variables.
+        Returns True if all critical checks pass, False otherwise.
+        If exit_on_error is True, calls sys.exit(1) on critical failure.
+        """
+        all_valid = True
         fallback_provider_name = settings.fallback_provider
-        if fallback_provider_name and fallback_provider_name not in self.providers_config:
-            logging.error(f"Fallback provider '{fallback_provider_name}' defined in settings not found in providers configuration.")
-            sys.exit(1)
+        if fallback_provider_name and fallback_provider_name not in providers_to_validate:
+            logging.error(f"Fallback provider '{fallback_provider_name}' defined in settings not found in the provided providers configuration.")
+            if exit_on_error:
+                sys.exit(1)
+            all_valid = False # Mark as invalid but continue checking other things if not exiting
 
-        for provider_name, config in self.providers_config.items():
+        for provider_name, config in providers_to_validate.items():
             env_api_key = os.getenv(config.apikey)
             if not env_api_key:
-                logging.warning(f"Environment variable '{config.apikey}' for provider '{provider_name}' is not set.")
+                logging.warning(f"Environment variable '{config.apikey}' for provider '{provider_name}' is not set. This is a warning.")
+        
+        return all_valid
+
+    def _validate_providers(self):
+        """Legacy wrapper for initial load validation. Calls sys.exit on failure."""
+        if not self._perform_provider_semantic_validation(self.providers_config, exit_on_error=True):
+            # This path should ideally not be reached if exit_on_error is true and there's an error,
+            # but as a safeguard:
+            logging.critical("Provider semantic validation failed during initial load.")
+            sys.exit(1)
+
 
     def load_fallback_rules(self) -> Dict[str, Dict[str, Any]]:
         """Loads and validates model fallback rules from the JSON file."""
@@ -186,10 +227,58 @@ class ConfigLoader:
             return True
 
         except ValidationError as ve:
-            logging.error(f"Validation error during reload of '{self.fallback_rules_path.name}': {ve.errors()}", exc_info=True)
+            logging.error(f"Validation error during reload of '{self.fallback_rules_path.name}': {ve.errors()}", exc_info=False) # No need for full stack for validation
             return False
         except Exception as e:
             logging.error(f"Failed to reload or validate '{self.fallback_rules_path.name}': {str(e)}", exc_info=True)
+            return False
+
+    def reload_providers_config(self) -> bool:
+        """
+        Reloads and validates provider configurations from the providers.json file.
+        Updates self.providers_config on success.
+        Returns True on success, False on failure.
+        """
+        if not self.providers_path.exists():
+            logging.error(f"Provider configuration file not found at {self.providers_path} during reload.")
+            return False
+
+        try:
+            with open(self.providers_path, 'r', encoding='utf-8') as f:
+                raw_provider_list = json5.load(f)
+
+            if not isinstance(raw_provider_list, list):
+                logging.error(f"Invalid format in {self.providers_path.name}: Expected a list of provider entries.")
+                return False
+
+            potential_new_providers_config: Dict[str, ProviderDetails] = {}
+            for item_dict in raw_provider_list:
+                # Validate the structure of each item in the list using ProviderConfig
+                # ProviderConfig expects a dict like {"provider_name": ProviderDetails_dict}
+                validated_entry = ProviderConfig.model_validate(item_dict)
+                
+                # Extract the provider name and details
+                # Since ProviderConfig ensures item_dict has one key after validation:
+                provider_name = list(validated_entry.root.keys())[0]
+                provider_details = validated_entry.root[provider_name] # This is already a ProviderDetails instance
+                potential_new_providers_config[provider_name] = provider_details
+            
+            # Perform semantic validation on the successfully parsed and structurally validated providers
+            if not self._perform_provider_semantic_validation(potential_new_providers_config, exit_on_error=False):
+                logging.error(f"Semantic validation failed during reload of {self.providers_path.name}.")
+                return False # Semantic validation failed (e.g., fallback provider missing)
+
+            # If all validations pass, update the actual instance config
+            self.providers_config = potential_new_providers_config
+            logging.info(f"Successfully reloaded and validated providers from {self.providers_path}")
+            logging.info(f"Reloaded providers: {list(self.providers_config.keys())}")
+            return True
+
+        except ValidationError as ve:
+            logging.error(f"Validation error during reload of '{self.providers_path.name}': {ve.errors()}", exc_info=False)
+            return False
+        except Exception as e:
+            logging.error(f"Failed to reload or validate '{self.providers_path.name}': {str(e)}", exc_info=True)
             return False
 
     def _validate_fallback_rules(self):
