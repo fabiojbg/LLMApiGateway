@@ -1,10 +1,10 @@
 # Project Guidelines
 
-- working with the project: To know what the project is about and how it is structured, read the README.md and the section 'Project Structure and Module Responsibilities" below
+- working with the project: To know what the project is about and how it is structured, read the README.md and the sections 'Project Structure' and 'Module Responsibilities" below.
 
 ## Documentation Requirements
 
--   Keep README.md and the section "Project Structure and Module Responsibilities" in this file(.clinerules) in sync with new capabilities
+-  Keep README.md and the sections "Project Structure" and "Module Responsibilities" in this file(.clinerules) in sync with new capabilities
 
 ## Code Style & Patterns
 
@@ -15,7 +15,10 @@
 
 - This project supports pip and uv package managers. You must mantain the requirements.txt and pyproject.toml in any change of the project dependencies
 
-## Project Structure and Module Responsibilities
+## Project Structure
+
+- The project is structured to separate concerns and maintain a clean architecture. 
+You must mantain this structure updated in case of any change in it or in file´s responsabilities
 
 ```
 /Project_Root_Folder/
@@ -68,7 +71,10 @@
 └── memory-bank/            # <--- Project context files (structure unchanged)
 ```
 
-## Key Module Responsibilities:
+## Module Responsibilities
+
+Here is a brief overview of the key modules and their responsibilities:
+You must mantain this section updated to allways reflect the actual module responsibilities
 
 *   **`main.py`:** Initializes the FastAPI application, includes API routers from `llm_gateway_core/api/v1/` (including the editor router), applies middleware, handles startup/shutdown events (including `ConfigLoader` initialization and making it available via `app.state`), serves static files from `static/`, and runs the Uvicorn server.
 *   **`llm_gateway_core/api/v1/chat.py`:** Defines the `APIRouter` for the `/v1/chat/completions` endpoint. Delegates request handling to `services/request_handler.py`.
