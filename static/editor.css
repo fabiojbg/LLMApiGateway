@@ -9,8 +9,8 @@ body {
 
 .container {
     max-width: 1000px;
-    margin: 30px auto;
-    padding: 25px 25px 0px 25px;
+    margin: 10px auto;
+    padding: 0px 10px 0px 10px;
     background-color: #fff;
     border-radius: 8px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
@@ -71,7 +71,7 @@ code {
 .editor-tab-content {
     border: 1px solid #ddd;
     border-radius: 5px;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
     height: 500px; /* Default height, CodeMirror will manage its own height */
 }
 
@@ -143,10 +143,14 @@ code {
 
 /* Theme Selector Styles */
 .controls {
-    margin-bottom: 20px;
+    margin-bottom: 10px;
     display: flex;
     align-items: center;
     gap: 10px; /* Adds space between label and select */
+    position:  absolute;
+    top:  10px;
+    right: 24px;
+    z-index: 10000;
 }
 
 .controls label {
