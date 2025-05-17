@@ -2,14 +2,15 @@ from fastapi.responses import StreamingResponse
 import httpx
 import logging
 import json5
-import copy # Added for deep copying request body
+import copy 
 
 # --- Helper Function for making the actual request ---
 async def make_llm_request(target_url: str, headers: dict, payload: dict, is_streaming: bool):
     """Makes the downstream request and handles streaming/non-streaming responses."""
-    first_chunk = True
+    looking_first_chunk = True
     error_in_stream = False
     error_detail = None
+    tokens_usage = None
 
     client = httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=60.0)) 
     payload_to_log = copy.deepcopy(payload)
@@ -18,106 +19,121 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
     try:
         if is_streaming:
             async def stream_generator():
-                nonlocal first_chunk, error_in_stream, error_detail
+                nonlocal looking_first_chunk, error_in_stream, error_detail, tokens_usage
                 async with client.stream("POST", target_url, headers=headers, json=payload, timeout=None) as response:
                     # Check initial status code for non-2xx errors before streaming
                     if response.status_code >= 400:
                          error_detail = await response.aread()
                          error_detail = error_detail.decode('utf-8')
                          logging.error(f"Downstream error {response.status_code} from {target_url}: {error_detail}")
-                         error_in_stream = True # Mark error to prevent further processing
-                         # Do not raise here, let the outer function handle failover
+                         error_in_stream = True 
                          return # Stop the generator
 
                     # Stream the response
                     async for chunk in response.aiter_bytes():
                         try:
-                            # Decode chunk to check content
-                            chunk_str = chunk.decode('utf-8')
+                            chunks =  [chunk_part for chunk_part in chunk.decode('utf-8').split("\n\n") if chunk_part.strip()] 
+                            for chunk_str in chunks:
+                                if not chunk_str.startswith("data: {"): 
+                                    logging.debug(f"Passing dummy chunk through: {chunk_str[:1000]}...")
+                                    continue
 
-                            # Check if this chunk should be ignored for 'first chunk' error check
-                            if chunk_str.startswith(": OPENROUTER PROCESSING"): # treat OpenRouter initial and not usefull chunks as ignored
-                                logging.debug(f"Ignoring dummy chunk: {chunk_str[:1000]}...")
-                                continue # Process next chunk
-
-                            # If it's not an ignored chunk AND we are still looking for the first *real* chunk
-                            if first_chunk:
-                                first_chunk = False # Mark that we've found the first *real* chunk
-                                logging.debug(f"Processing first *real* chunk from {target_url}: {chunk_str[:1000]}...")
-                                # Check this first *real* chunk for error messages
-                                if '"error":' in chunk_str or '"detail"' in chunk_str:
-                                     try:
-                                         # Attempt to parse as JSON to get detail
-                                         error_json = json5.loads(chunk_str.replace("data: ", "").strip())
-                                         error_detail = str(error_json.get("error", {})) or error_json.get("detail")
-                                     except Exception as json_e: # Catch specific JSON errors
-                                         logging.warning(f"Failed to parse potential error JSON in first chunk: {json_e}. Falling back to raw chunk.")
-                                         error_detail = chunk_str # Fallback to raw chunk
-                                     logging.warning(f"Error detected in first *real* stream chunk from {target_url}: {error_detail}")
-                                     error_in_stream = True
-                                     return # Stop the generator, do not yield the error chunk
+                                if looking_first_chunk:
+                                    looking_first_chunk = False 
+                                    logging.debug(f"Processing first *real* chunk from {target_url}: {chunk_str[:1000]}...")
+                                    chunk_json = json5.loads(chunk_str[len("data: "):])
+                                    if "error" in chunk_json or "detail" in chunk_json:
+                                        error_detail = chunk_str 
+                                        error_in_stream = True
+                                        logging.warning(f"Error detected in first *real* stream chunk from {target_url}: {error_detail}")
+                                        return 
 
                         except UnicodeDecodeError:
                             logging.warning(f"Could not decode chunk from {target_url} as UTF-8. Skipping content check for this chunk.")
-                            if first_chunk:
-                                pass # Keep first_chunk = True until a decodable, non-ignored chunk arrives
+                            if looking_first_chunk:
+                                pass 
 
-                        # Yield the current chunk if it's not empty (and wasn't an error chunk that caused a return)
                         if chunk:
                             yield chunk
                         else: 
                             logging.debug(f"Skipping empty chunk received from {target_url}")                           
 
-
-            # Check for error *before* returning the StreamingResponse
             gen = stream_generator()
-            # Need to 'prime' the generator to catch immediate errors like status code errors
-            try:
-                first_yield = await gen.__anext__()
-                # If we got here, the first chunk (or status code) was okay (or it was empty)
-            except StopAsyncIteration:
-                 # Generator finished immediately, likely due to an error detected before first yield
-                 if error_in_stream:
-                     return None, error_detail # Signal error
-                 # Or it could be a genuinely empty successful stream                 
-                 pass # Continue to return the (now exhausted) generator below
+            first_content_chunk_candidate = None
+            # Prime until the first real data chunk
+            while True:
+                try:
+                    chunk = await gen.__anext__()
+                except StopAsyncIteration:
+                    break
+                try:
+                    parts = [p for p in chunk.decode('utf-8').split("\n\n") if p.strip()]
+                    real_found = False
+                    for part in parts:
+                        if part.startswith("data: {"):
+                            real_found = True
+                            data_json = json5.loads(part[len("data: "):])
+                            if "error" in data_json or "detail" in data_json:
+                                error_detail = part
+                                error_in_stream = True
+                            else:
+                                first_content_chunk_candidate = chunk
+                            break
+                    if real_found:
+                        break
+                except UnicodeDecodeError:
+                    continue
 
             if error_in_stream:
-                 return None, error_detail # Signal error based on check within generator
+                return None, error_detail
 
-            # If no immediate error, return the (potentially primed) generator
             async def combined_generator():
-                nonlocal error_in_stream
-                # Yield the first chunk if it was successfully retrieved
-                if not first_chunk and not error_in_stream: # first_chunk is False if priming succeeded
-                    logging.debug(f"Yielding first chunk from {target_url}: {first_yield[:1000]}...")  
-                    yield first_yield
-                # Yield the rest
+                nonlocal error_in_stream, error_detail
+
+                # Yield the first real data chunk
+                if first_content_chunk_candidate is not None:
+                    logging.debug(f"Yielding first real chunk from {target_url}: {first_content_chunk_candidate[:1000]}...")
+                    yield first_content_chunk_candidate
+                    # Yield the rest
                 async for chunk in gen:
                     try:
-                        chunk_str = chunk.decode('utf-8')
-                        if chunk_str.startswith("data:") and '"code":' in chunk_str : # try if is an error chunk(openrouter)
-                            # Attempt to parse as JSON to get detail
-                            try:
-                                error_json = json5.loads(chunk_str.replace("data: ", "").strip())
-                                error_detail = error_json.get("error", {}).get("message") or error_json.get("detail")
-                            except:
-                                error_detail = chunk_str # Fallback to raw chunk
-                            logging.warning(f"Error detected in stream chunk from {target_url}: {error_detail}")
-                            error_in_stream = True
-                            error_detail = chunk_str
+                        chunks =  [chunk_part for chunk_part in chunk.decode('utf-8').split("\n\n") if chunk_part.strip()] 
+                        if( len(chunks) > 1):
+                            logging.debug(f"Multi chunks received {target_url}: {chunk[:1000]}...")  
+
+                        for chunk_str in chunks:
+                            if not chunk_str.startswith("data: {"):
+                                continue
+                            chunk_json = json5.loads(chunk_str[len("data: "):])
+                            if "code" in chunk_json : # try if is an error chunk(openrouter)
+                                # Attempt to parse as JSON to get detail
+                                try:
+                                    error_detail = chunk_json.get("error", {}).get("message") or chunk_json.get("detail")
+                                except:
+                                    error_detail = chunk_str # Fallback to raw chunk
+                                logging.warning(f"Error detected in stream chunk from {target_url}: {error_detail}")
+                                error_in_stream = True
+                                error_detail = chunk_str
+
+                            if "usage" in chunk_json:
+                                tokens_usage = chunk_json.get("usage")
+
                     except:
                         logging.warning(f"Could not decode chunk from {target_url} as UTF-8. Skipping content check for this chunk.")
                         
                     logging.debug(f"Yielding chunk from {target_url}: {chunk[:1000]}...")  
                     yield chunk
 
+                logging.debug(f"Finished streaming from {target_url}. Token Usage: {tokens_usage if tokens_usage else ''}")
+
             return StreamingResponse(
                 combined_generator(),
                 media_type="text/event-stream",
                 headers={"Transfer-Encoding": "chunked", "X-Accel-Buffering": "no"}
             ), error_detail
+        
         else:
+
             # Non-streaming request
             response = await client.post(target_url, headers=headers, json=payload, timeout=None)
             

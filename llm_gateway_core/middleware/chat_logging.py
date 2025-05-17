@@ -11,7 +11,7 @@ from typing import Callable
 
 logger = logging.getLogger(__name__)
 
-def write_log(req_headers, req_body_str, llm_response_accum):
+def write_log(req_headers, req_body_str, llm_response_accum, tokens_usage):
     try:
         # Create log file with the required name format: "YY-MM-DD_HH:MM:ss:mmm.txt"
         log_time = datetime.now()
@@ -20,6 +20,13 @@ def write_log(req_headers, req_body_str, llm_response_accum):
         log_content = (
             f"{division_line}\nRequest Headers:\n{division_line}\n\n{pformat(req_headers, indent=2)}\n\n"
             f"{division_line}\nRequest Body:\n-{division_line}\n\n{req_body_str}\n\n"
+            f"{division_line}\nTokens Usage:\n-{division_line}\n\n"
+                            f"Input: {tokens_usage["prompt_tokens"]}\n"
+                            f"Output: {tokens_usage["completion_tokens"]}\n" 
+                            f"Cached: {tokens_usage["cached_tokens"]}\n"
+                            f"Reasoning: {tokens_usage["reasoning_tokens"]}\n"
+                            f"Total: {tokens_usage["total_tokens"]}\n"
+                            f"Cost: ${tokens_usage["cost"]:0.6f}\n\n"
             f"{division_line}\nLLM Response:\n{division_line}\n\n{llm_response_accum}"
         )
         os.makedirs("logs", exist_ok=True)
@@ -54,6 +61,14 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
         req_headers = dict(request.headers)
         
         llm_response_accum = ""
+        tokens_usage = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "reasoning_tokens" : 0,
+            "cached_tokes": 0,
+            "cost": 0
+        }
     except Exception as e:    
         logger.error(f"Error capturing request body in log_chat middleware: {e}", exc_info=True)
         response = await call_next(request)
@@ -69,37 +84,37 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
                 nonlocal llm_response_accum
                 async for chunk in original_iterator:
                     try:
-                        decoded_chunk = chunk.decode("utf-8").strip()
-                        if decoded_chunk.startswith("data: ") or decoded_chunk.startswith("{"):
-                            if decoded_chunk.startswith("{"):
-                                chunks = [decoded_chunk]
-                            else:
-                                chunks = decoded_chunk.split("data: ")
-                            for chunk_data in chunks:
-                                try:
-                                    data = json.loads(chunk_data.strip())
-                                    if "choices" in data and isinstance(data["choices"], list):
-                                        for choice in data["choices"]:
-                                            if "delta" in choice and "content" in choice["delta"]:
-                                                content_piece = choice["delta"]["content"]
-                                                if content_piece:
-                                                    llm_response_accum += content_piece
-                                            else:
-                                                if "message" in choice and "content" in choice["message"]:
-                                                    content_piece = choice["message"]["content"]
-                                                    if content_piece:
-                                                        llm_response_accum += content_piece
+                        chunks =  [chunk_part for chunk_part in chunk.decode('utf-8').split("\n\n") if chunk_part.strip()]
+                        for decoded_chunk in chunks:
+                            if not decoded_chunk.startswith("data: {"): #ingnore if it is not a json
+                                continue
 
-                                    if "error" in data:
-                                        llm_response_accum += decoded_chunk
-                                        write_log(req_headers, req_body_str, llm_response_accum)
-                                except:
-                                    pass
-                    except Exception:
-                        pass
+                            decoded_chunk = decoded_chunk[len('data: '):].strip()
+                            chunk_json = json.loads(decoded_chunk)
+                            if "choices" in chunk_json:
+                                for choice in chunk_json["choices"]:
+                                    if "delta" in choice and "content" in choice["delta"]:
+                                        content_piece = choice["delta"]["content"]
+                                        if content_piece:
+                                            llm_response_accum += content_piece
+                                    elif "message" in choice and "content" in choice["message"]:
+                                        content_piece = choice["message"]["content"]
+                                        if content_piece:
+                                            llm_response_accum += content_piece
+                            if "usage" in chunk_json:
+                                tokens_usage = get_token_usage(chunk_json)
+
+                            if "error" in chunk_json:
+                                llm_response_accum += decoded_chunk
+                                write_log(req_headers, req_body_str, llm_response_accum, tokens_usage)
+                    except Exception as ex:
+                        logging.error(f"ChatLogging: error processing chunk: {chunk}: {ex}", exc_info=True)
+                        pass #errors here must be ignored so the chunk can be streamed
+
                     yield chunk
                 # After streaming completes, write the log file
-                write_log(req_headers, req_body_str, llm_response_accum)
+                write_log(req_headers, req_body_str, llm_response_accum, tokens_usage)
+
             response.body_iterator = accumulated_generator()
         else:
             # For non-streaming responses, attempt to read full body content
@@ -110,12 +125,53 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
                         first = response_data["choices"][0]
                         if "message" in first and "content" in first["message"]:
                             llm_response_accum = first["message"]["content"]
-                except Exception:
+                        if "usage" in response_data:
+                            tokens_usage = get_token_usage(response_data)
+                except Exception as ex:
+                    logging.error(f"ChatLogging: error processing chunk: {response_data}: {ex}", exc_info=True)
                     pass
             # Write log file immediately for non-streaming responses
-            write_log(req_headers, req_body_str, llm_response_accum)
+            write_log(req_headers, req_body_str, llm_response_accum, tokens_usage)
         
     except Exception as e:
         logger.error(f"Error in log_chat_completions middleware: {e}", exc_info=True)
 
     return response
+
+def get_token_usage(chunk_data):
+    """
+    Extracts token usage information from the chunk data.
+    """
+    tokens_usage = {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+        "reasoning_tokens" : 0,
+        "cached_tokes": 0,
+        "cost": 0
+    }
+    try:       
+        if "usage" in chunk_data and isinstance(chunk_data["usage"], dict):
+            usage = chunk_data["usage"]
+            if "prompt_tokens" in usage:
+                tokens_usage["prompt_tokens"] = usage["prompt_tokens"]
+            if "completion_tokens" in usage:
+                tokens_usage["completion_tokens"] = usage["completion_tokens"]
+            if "total_tokens" in usage:
+                tokens_usage["total_tokens"] = usage["total_tokens"]
+            if "cost" in usage:
+                tokens_usage["cost"] = usage["cost"]
+            if "completion_tokens_details" in usage and \
+            "reasoning_tokens" in usage["completion_tokens_details"]:
+                tokens_usage["reasoning_tokens"] = usage["completion_tokens_details"]["reasoning_tokens"]
+            if "prompt_tokens_details" in usage and \
+            "cached_tokens" in usage["prompt_tokens_details"]:
+                tokens_usage["cached_tokens"] = usage["prompt_tokens_details"]["cached_tokens"]
+
+            if tokens_usage["reasoning_tokens"]>0:
+                tokens_usage["completion_tokens"] = tokens_usage["completion_tokens"] - tokens_usage["reasoning_tokens"]
+    except Exception as ex:
+        logging.error(f"ChatLogging: error processing tokens usage: {ex}", exc_info=True)
+        pass
+
+    return tokens_usage
