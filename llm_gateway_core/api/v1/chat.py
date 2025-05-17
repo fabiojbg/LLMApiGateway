@@ -142,7 +142,7 @@ async def chat_completions(request: Request):
                 #error_detail = 'test error' # for debugging only
 
                 if response_data and error_detail is None:
-                    logging.info(f"Connection success to model '{provider_model}' in provider '{provider_name}'. Starting streaming response...")
+                    logging.info(f"Connection success to model '{provider_model}' in provider '{provider_name}'. {'Starting streaming' if is_streaming else 'Waiting'} response...")
                     return response_data # Success! Return the response.
                 else:
                     payload["messages"] = "<REMOVED>" # Remove messages from payload for logging
@@ -174,7 +174,7 @@ async def chat_completions(request: Request):
 
                         
                     if response_data and error_detail is None:
-                        logging.info(f"Connection success with model '{provider_model}' in provider '{provider_name}' via '{sub_provider}'. Starting streaming response...")
+                        logging.info(f"Connection success with model '{provider_model}' in provider '{provider_name}' via '{sub_provider}'. {'Starting streaming' if is_streaming else 'Received'} response...")
                         return response_data # Success! Return the response.
                     else:
                         logging.warning(f"Failed attempt with model '{provider_model}' via '{provider_name}' and subprovider '{sub_provider}'.\r\n" \

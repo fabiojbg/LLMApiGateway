@@ -133,9 +133,10 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
             ), error_detail
         
         else:
-
+            serialized_payload = json5.dumps(payload).encode("utf-8")
             # Non-streaming request
-            response = await client.post(target_url, headers=headers, json=payload, timeout=None)
+            response = await client.post(target_url, headers=headers, content=serialized_payload, timeout=None)
+            logging.debug(f"Response received from {target_url}")
             
             # Check for HTTP errors
             if response.status_code >= 400:
