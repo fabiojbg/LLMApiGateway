@@ -129,7 +129,6 @@ async def chat_completions(request: Request):
             if not subproviders_ordering or len(subproviders_ordering) <= 0 or model_fallback_rule["use_provider_order_as_fallback"]== False: 
 
                 logging.info(f"Attempting model '{provider_model}' in provider: '{provider_name}'")
-                payload = copy.deepcopy(request_body_json)
                 payload["model"] = provider_model # Override model if needed
 
                 if subproviders_ordering and len(subproviders_ordering) > 0:
@@ -159,7 +158,6 @@ async def chat_completions(request: Request):
                 
                 for sub_provider in subproviders_ordering:
                     logging.info(f"Attempting model '{provider_model}' on sub-provider: '{sub_provider}' in '{provider_name}'")
-                    payload = copy.deepcopy(request_body_json)
                     payload["model"] = provider_model # real provider model name
                     
                     # Add provider ordering info to the request (specific to providers like OpenRouter)
