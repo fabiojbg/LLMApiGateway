@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+.env
+venv/
+ENV/
+.venv
+
+# Database files - will be mounted as a volume
+db/
+
+# Log files - will be ephemeral
+logs/
+
+# Configuration files - will be mounted or provided via env vars
+.env
+providers.json
+models_fallback_rules.json
+
+# Docker specific files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation and design files
+*.md
+images/
+docs/
+memory-bank/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo

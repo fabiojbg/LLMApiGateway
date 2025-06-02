@@ -139,6 +139,9 @@ dmypy.json
 # pytype static type analyzer
 .pytype/
 
+# Suggested docker volume
+data/
+
 # Cython debug symbols
 cython_debug/
 models_fallback_rules.mine.json
