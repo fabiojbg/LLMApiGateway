@@ -237,16 +237,14 @@ The rotation state is tracked per API key and gateway model combination, ensurin
 Install Python dependencies once if you're using pip:
 ```bash
 pip install -r requirements.txt
-```
-and run
-```bash
-python llmgateway.py
+python main.py
 ```
 
 ### With UV (preferable)
 if uv is installed, simply do:
 ```bash
-uv run llmgateway.py
+uv venv
+uv run main.py
 ```
 
 ### With Docker
