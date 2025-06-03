@@ -243,9 +243,11 @@ and run
 python llmgateway.py
 ```
 
-
 ### With UV (preferable)
 if uv is installed, simply do:
 ```bash
 uv run llmgateway.py
 ```
+
+### With Docker
+if you prefer docker deployment see [this guide](/docker/README.md) (Thanks  [canadaduane](https://github.com/canadaduane)!👍)
