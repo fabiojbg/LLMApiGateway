@@ -1,10 +1,9 @@
 # Project Guidelines
 
-- working with the project: To know what the project is about and how it is structured, read the README.md and the sections 'Project Structure' and 'Module Responsibilities" below.
-
-## Documentation Requirements
-
--  Keep README.md and the sections "Project Structure" and "Module Responsibilities" in this file(.clinerules) in sync with new capabilities
+- working with the project: To know what the project is about and how it is structured, read the README.md and the sections 'Project Structure' and 'Module Responsibilities' below.
+- Use Context7 MCP Tool, if available, to always gather latest documentation/knowledge about a library
+- Use Firecrawl MCP Tool, if available, to search/scrape web pages whenever necessary
+- Keep README.md and the sections "Project Structure" and "Module Responsibilities" in this file(.clinerules) in sync with new capabilities
 
 ## Code Style & Patterns
 
