@@ -196,7 +196,7 @@ Custom headers a also available if needed.
                 "provider": "xAI",
                 "model" : "grok-3-mini-beta",                
                 "custom_body_params" : {
-                    "reasoning_effort" : "high"  // grok has this reasoning_effort parameter that can be set here
+                    "reasoning": { "effort": "high" }  // grok has this reasoning/effort parameter that can be set like this
                 },
                 "custom_headers" : {
                     "x-param" : "demo"  // custom header example
