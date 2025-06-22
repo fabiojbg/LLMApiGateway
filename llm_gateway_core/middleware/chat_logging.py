@@ -21,8 +21,6 @@ def write_log(req_headers, req_body_str, llm_response_accum, tokens_usage):
         filename = log_time.strftime("%Y-%m-%d_%H-%M-%S") + (".%03d" % (log_time.microsecond // 1000)) + ".txt"
         division_line = "-" * 100
         log_content = (
-            f"{division_line}\nRequest Headers:\n{division_line}\n\n{pformat(req_headers, indent=2)}\n\n"
-            f"{division_line}\nRequest Body:\n-{division_line}\n\n{req_body_str}\n\n"
             f"{division_line}\nTokens Usage:\n-{division_line}\n\n"
                 f"Input: {tokens_usage['prompt_tokens']}\n"
                 f"Output: {tokens_usage['completion_tokens']}\n"
@@ -30,6 +28,8 @@ def write_log(req_headers, req_body_str, llm_response_accum, tokens_usage):
                 f"Reasoning: {tokens_usage['reasoning_tokens']}\n"
                 f"Total: {tokens_usage['total_tokens']}\n"
                 f"Cost: ${tokens_usage['cost']:0.6f}\n\n"
+            f"{division_line}\nRequest Headers:\n{division_line}\n\n{pformat(req_headers, indent=2)}\n\n"
+            f"{division_line}\nRequest Body:\n-{division_line}\n\n{req_body_str}\n\n"
             f"{division_line}\nLLM Response:\n{division_line}\n\n{llm_response_accum}"
         )
         os.makedirs("logs", exist_ok=True)
