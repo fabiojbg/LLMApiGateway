@@ -221,6 +221,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 messageArea.textContent = `${configName} ${body.message.toLowerCase()}`;
                 messageArea.className = 'success';
             } else {
+                messageArea.className = 'error';
                 let errorMessage = `Error saving ${configName} (HTTP ${status}): `;
                 if (isRawTextError) {
                     errorMessage += body.detail; // Show the raw text error
