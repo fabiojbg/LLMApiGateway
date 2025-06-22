@@ -9,8 +9,6 @@ from pydantic import ValidationError
 # If ModelFallbackConfig is for a single rule, we'd need a List[ModelFallbackConfig]
 from llm_gateway_core.config.loader import ModelFallbackConfig, ProviderConfig # Adjust if Pydantic models are elsewhere
 
-logger = logging.getLogger(__name__)
-
 editor_router = APIRouter()
 
 # Path to the configuration files
@@ -31,14 +29,14 @@ async def get_editor_page(request: Request):
     """Serves the HTML page for the configuration editor."""
     editor_html_path = HTML_DIR / "rules-editor.html"
     if not editor_html_path.exists():
-        logger.error(f"Editor HTML file not found at {editor_html_path}")
+        logging.error(f"Editor HTML file not found at {editor_html_path}")
         raise HTTPException(status_code=404, detail="Editor page not found.")
     try:
         with open(editor_html_path, "r") as f:
             html_content = f.read()
         return HTMLResponse(content=html_content)
     except Exception as e:
-        logger.error(f"Error reading editor HTML file: {e}", exc_info=True)
+        logging.error(f"Error reading editor HTML file: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Could not load editor page.")
 
 # If router is included with prefix /v1, this becomes /v1/config/models-rules
@@ -46,14 +44,14 @@ async def get_editor_page(request: Request):
 async def get_models_rules_text(request: Request):
     """Fetches the current raw text content of models_fallback_rules.json."""
     if not FALLBACK_RULES_CONFIG_FILE_PATH.exists():
-        logger.error(f"Configuration file {FALLBACK_RULES_CONFIG_FILE_PATH.name} not found.")
+        logging.error(f"Configuration file {FALLBACK_RULES_CONFIG_FILE_PATH.name} not found.")
         raise HTTPException(status_code=404, detail=f"{FALLBACK_RULES_CONFIG_FILE_PATH.name} not found.")
     try:
         with open(FALLBACK_RULES_CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
             content = f.read()
         return PlainTextResponse(content=content)
     except Exception as e:
-        logger.error(f"Error reading {FALLBACK_RULES_CONFIG_FILE_PATH.name}: {e}", exc_info=True)
+        logging.error(f"Error reading {FALLBACK_RULES_CONFIG_FILE_PATH.name}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Could not read {FALLBACK_RULES_CONFIG_FILE_PATH.name}.")
 
 # If router is included with prefix /v1, this becomes /v1/config/models-rules
@@ -65,7 +63,7 @@ async def save_models_rules(request: Request, payload_text: str = Body(..., medi
     """
     config_loader = request.app.state.config_loader
     if not config_loader:
-        logger.error("ConfigLoader not found in application state.")
+        logging.error("ConfigLoader not found in application state.")
         raise HTTPException(status_code=500, detail="Internal server error: ConfigLoader not available.")
 
     try:
@@ -82,24 +80,24 @@ async def save_models_rules(request: Request, payload_text: str = Body(..., medi
         with open(FALLBACK_RULES_CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
             f.write(payload_text)
 
-        logger.info(f"Successfully wrote updated configuration (with comments) to {FALLBACK_RULES_CONFIG_FILE_PATH.name}.")
+        logging.info(f"Successfully wrote updated configuration (with comments) to {FALLBACK_RULES_CONFIG_FILE_PATH.name}.")
 
         # Attempt to reload the configuration
         if config_loader.reload_fallback_rules():
-            logger.info(f"Configuration {FALLBACK_RULES_CONFIG_FILE_PATH.name} reloaded successfully.")
+            logging.info(f"Configuration {FALLBACK_RULES_CONFIG_FILE_PATH.name} reloaded successfully.")
             return {"message": f"{FALLBACK_RULES_CONFIG_FILE_PATH.name} updated and reloaded successfully."}
         else:
-            logger.error(f"Configuration {FALLBACK_RULES_CONFIG_FILE_PATH.name} was updated, but failed to reload.")
+            logging.error(f"Configuration {FALLBACK_RULES_CONFIG_FILE_PATH.name} was updated, but failed to reload.")
             # The file is updated, but the running config might be stale. This is a critical state.
             raise HTTPException(status_code=500, detail=f"{FALLBACK_RULES_CONFIG_FILE_PATH.name} updated, but failed to reload. Check server logs.")
 
     except ValidationError as ve:
-        logger.error(f"Validation error saving {FALLBACK_RULES_CONFIG_FILE_PATH.name}: {ve.errors()}", exc_info=False) # No need for full stack trace for validation
+        logging.error(f"Validation error saving {FALLBACK_RULES_CONFIG_FILE_PATH.name}: {ve.errors()}", exc_info=False) # No need for full stack trace for validation
         # Provide detailed validation errors to the client
         return JSONResponse(status_code=400, content={"detail": "Validation Error", "errors": ve.errors()})
     except Exception as e:
-        logger.error(f"Error saving {FALLBACK_RULES_CONFIG_FILE_PATH.name}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Could not save {FALLBACK_RULES_CONFIG_FILE_PATH.name}.")
+        logging.error(f"Error saving {FALLBACK_RULES_CONFIG_FILE_PATH.name}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Could not save {FALLBACK_RULES_CONFIG_FILE_PATH.name}: Error = {e}")
 
 
 # --- Endpoints for providers.json ---
@@ -108,14 +106,14 @@ async def save_models_rules(request: Request, payload_text: str = Body(..., medi
 async def get_providers_text(request: Request):
     """Fetches the current raw text content of providers.json."""
     if not PROVIDERS_CONFIG_FILE_PATH.exists():
-        logger.error(f"Configuration file {PROVIDERS_CONFIG_FILE_PATH.name} not found.")
+        logging.error(f"Configuration file {PROVIDERS_CONFIG_FILE_PATH.name} not found.")
         raise HTTPException(status_code=404, detail=f"{PROVIDERS_CONFIG_FILE_PATH.name} not found.")
     try:
         with open(PROVIDERS_CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
             content = f.read()
         return PlainTextResponse(content=content)
     except Exception as e:
-        logger.error(f"Error reading {PROVIDERS_CONFIG_FILE_PATH.name}: {e}", exc_info=True)
+        logging.error(f"Error reading {PROVIDERS_CONFIG_FILE_PATH.name}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Could not read {PROVIDERS_CONFIG_FILE_PATH.name}.")
 
 @editor_router.post("/config/providers", tags=["Config Editor API"])
@@ -126,7 +124,7 @@ async def save_providers_config(request: Request, payload_text: str = Body(..., 
     """
     config_loader = request.app.state.config_loader
     if not config_loader:
-        logger.error("ConfigLoader not found in application state.")
+        logging.error("ConfigLoader not found in application state.")
         raise HTTPException(status_code=500, detail="Internal server error: ConfigLoader not available.")
 
     try:
@@ -144,22 +142,22 @@ async def save_providers_config(request: Request, payload_text: str = Body(..., 
         with open(PROVIDERS_CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
             f.write(payload_text)
 
-        logger.info(f"Successfully wrote updated providers configuration (with comments) to {PROVIDERS_CONFIG_FILE_PATH.name}.")
+        logging.info(f"Successfully wrote updated providers configuration (with comments) to {PROVIDERS_CONFIG_FILE_PATH.name}.")
 
         # Attempt to reload the providers configuration
         if hasattr(config_loader, 'reload_providers_config') and config_loader.reload_providers_config():
-            logger.info(f"Providers configuration {PROVIDERS_CONFIG_FILE_PATH.name} reloaded successfully.")
+            logging.info(f"Providers configuration {PROVIDERS_CONFIG_FILE_PATH.name} reloaded successfully.")
             return {"message": f"{PROVIDERS_CONFIG_FILE_PATH.name} updated and reloaded successfully."}
         elif not hasattr(config_loader, 'reload_providers_config'):
-            logger.error(f"ConfigLoader does not have 'reload_providers_config' method. {PROVIDERS_CONFIG_FILE_PATH.name} was updated, but not reloaded.")
+            logging.error(f"ConfigLoader does not have 'reload_providers_config' method. {PROVIDERS_CONFIG_FILE_PATH.name} was updated, but not reloaded.")
             raise HTTPException(status_code=500, detail=f"{PROVIDERS_CONFIG_FILE_PATH.name} updated, but not reloaded (method missing). Check server logs.")
         else:
-            logger.error(f"Providers configuration {PROVIDERS_CONFIG_FILE_PATH.name} was updated, but failed to reload.")
+            logging.error(f"Providers configuration {PROVIDERS_CONFIG_FILE_PATH.name} was updated, but failed to reload.")
             raise HTTPException(status_code=500, detail=f"{PROVIDERS_CONFIG_FILE_PATH.name} updated, but failed to reload. Check server logs.")
 
     except ValidationError as ve:
-        logger.error(f"Validation error saving {PROVIDERS_CONFIG_FILE_PATH.name}: {ve.errors()}", exc_info=False)
+        logging.error(f"Validation error saving {PROVIDERS_CONFIG_FILE_PATH.name}: {ve.errors()}", exc_info=False)
         return JSONResponse(status_code=400, content={"detail": "Validation Error", "errors": ve.errors()})
     except Exception as e:
-        logger.error(f"Error saving {PROVIDERS_CONFIG_FILE_PATH.name}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Could not save {PROVIDERS_CONFIG_FILE_PATH.name}.")
+        logging.error(f"Error saving {PROVIDERS_CONFIG_FILE_PATH.name}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Could not save {PROVIDERS_CONFIG_FILE_PATH.name}. Error = {e}")

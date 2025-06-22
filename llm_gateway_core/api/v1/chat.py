@@ -12,8 +12,6 @@ from ...config.settings import settings
 from ...db.model_rotation_db import ModelRotationDB
 from ...services.request_handler import make_llm_request
 
-logger = logging.getLogger(__name__)
-
 # model_rotation_db can remain as a module-level instance
 model_rotation_db = ModelRotationDB() # Instantiate DB access
 
@@ -23,7 +21,7 @@ router = APIRouter()
 async def chat_completions(request: Request):
     config_loader_instance: ConfigLoader = request.app.state.config_loader
     if not config_loader_instance:
-        logger.error("ConfigLoader not found in application state within chat_completions.")
+        logging.error("ConfigLoader not found in application state within chat_completions.")
         # It's good practice to log this, as it indicates a setup issue in main.py or app lifecycle
         raise HTTPException(status_code=500, detail="Internal server error: Core configuration not available.")
     
