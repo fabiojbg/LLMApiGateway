@@ -111,6 +111,8 @@ async def chat_completions(request: Request):
         target_url = f"{provider_base_url.rstrip('/')}/chat/completions" # Ensure single slash
         payload = copy.deepcopy(request_body_json)
         payload["model"] = provider_model # real provider model name                
+        if provider_name == "openrouter" and "usage" not in payload:
+            payload["usage"] = {"include": True }
         custom_body_params = model_fallback_rule.get("custom_body_params", {})
         if custom_body_params:
             for key, value in custom_body_params.items():

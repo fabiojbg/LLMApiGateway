@@ -47,11 +47,10 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
                                         error_in_stream = True
                                         logging.warning(f"Error detected in first *real* stream chunk from {target_url}: {error_detail}")
                                         return 
-
-                        except UnicodeDecodeError:
-                            logging.warning(f"Could not decode chunk from {target_url} as UTF-8. Skipping content check for this chunk.")
+                        except Exception as e:
+                            logging.warning(f"StreamGenerator: Unexpected error processing chunk. Skipping content check for this chunk. Error={e}. Chunk={chunk[:4000]}")
                             if looking_first_chunk:
-                                pass 
+                                pass
 
                         if chunk:
                             yield chunk
@@ -98,28 +97,32 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
                 async for chunk in gen:
                     try:
                         chunks =  [chunk_part for chunk_part in chunk.decode('utf-8').split("\n\n") if chunk_part.strip()] 
-                        if( len(chunks) > 1):
-                            logging.debug(f"Multi chunks received {target_url}: {chunk[:1000]}...")  
+                        # if( len(chunks) > 1):
+                        #     logging.info(f"Multi chunks received...")  
 
                         for chunk_str in chunks:
+                            #print(f".", end='')  # indicates some chunk is being processed
                             if not chunk_str.startswith("data: {"):
                                 continue
-                            chunk_json = json5.loads(chunk_str[len("data: "):])
-                            if "code" in chunk_json : # try if is an error chunk(openrouter)
-                                # Attempt to parse as JSON to get detail
-                                try:
-                                    error_detail = chunk_json.get("error", {}).get("message") or chunk_json.get("detail")
-                                except:
-                                    error_detail = chunk_str # Fallback to raw chunk
-                                logging.warning(f"Error detected in stream chunk from {target_url}: {error_detail}")
-                                error_in_stream = True
-                                error_detail = chunk_str
+                            try:                               
+                                chunk_json = json5.loads(chunk_str[len("data: "):])
+                                if "code" in chunk_json : # try if is an error chunk(openrouter)
+                                    # Attempt to parse as JSON to get detail
+                                    try:
+                                        error_detail = chunk_json.get("error", {}).get("message") or chunk_json.get("detail")
+                                    except:
+                                        error_detail = chunk_str # Fallback to raw chunk
+                                    logging.warning(f"Error detected in stream chunk from {target_url}: {error_detail}. Error={e}")
+                                    error_in_stream = True
+                                    error_detail = chunk_str
 
-                            if "usage" in chunk_json:
-                                tokens_usage = chunk_json.get("usage")
+                                if "usage" in chunk_json:
+                                    tokens_usage = chunk_json.get("usage")
+                            except Exception as e:
+                                logging.warning(f"CombinedGenerator: Could not decode chunk part. Skipping part. Error={e}. Chunk_part={chunk_str}")
 
-                    except:
-                        logging.warning(f"Could not decode chunk from {target_url} as UTF-8. Skipping content check for this chunk.")
+                    except Exception as e:
+                        logging.warning(f"CombinedGenerator: Could not decode chunk. Skipping content check for this chunk. Error={e}. Chunk={chunk}")
                         
                     logging.debug(f"Yielding chunk from {target_url}: {chunk[:1000]}...")  
                     yield chunk
@@ -154,7 +157,7 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
                 return response_json, None # Success
             except json5.JSONDecodeError as json_err:
                  # Handle cases where the response is not valid JSON despite a 2xx status
-                 error_detail = f"Invalid JSON response from {target_url}: {response.text[:1000]}..."
+                 error_detail = f"Invalid JSON response from {target_url}. Error={e}. Response= {response.text[:1000]}..."
                  logging.error(error_detail, exc_info=True)
                  return None, error_detail # Signal error
 

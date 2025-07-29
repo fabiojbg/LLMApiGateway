@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from typing import Callable
 import threading
 import queue
+import json5
 import time
 
 logger = logging.getLogger(__name__)
@@ -78,32 +79,34 @@ class ChunkProcessorThread(threading.Thread):
             try:
                 chunks = [chunk_part for chunk_part in chunk.decode('utf-8').split("\n\n") if chunk_part.strip()]
                 for decoded_chunk in chunks:
-                    if not decoded_chunk.startswith("data: {") and \
-                       not decoded_chunk.startswith("{"):  # ignore if it is not a json
-                        continue
+                    try:
+                        if not decoded_chunk.startswith("data: {") and \
+                        not decoded_chunk.startswith("{"):  # ignore if it is not a json
+                            continue
 
-                    if decoded_chunk.startswith("data: "):
-                        decoded_chunk = decoded_chunk[len('data: '):].strip()
-                    chunk_json = json.loads(decoded_chunk)
-                    if "choices" in chunk_json:
-                        for choice in chunk_json["choices"]:
-                            if "delta" in choice and "content" in choice["delta"]:
-                                content_piece = choice["delta"]["content"]
-                                if content_piece:
-                                    self.llm_response_accum += content_piece
-                            elif "message" in choice and "content" in choice["message"]:
-                                content_piece = choice["message"]["content"]
-                                if content_piece:
-                                    self.llm_response_accum += content_piece
-                    if "usage" in chunk_json:
-                        self.tokens_usage = get_token_usage(chunk_json)
+                        if decoded_chunk.startswith("data: "):
+                            decoded_chunk = decoded_chunk[len('data: '):].strip()
+                        chunk_json = json5.loads(decoded_chunk)
+                        if "choices" in chunk_json:
+                            for choice in chunk_json["choices"]:
+                                if "delta" in choice and "content" in choice["delta"]:
+                                    content_piece = choice["delta"]["content"]
+                                    if content_piece:
+                                        self.llm_response_accum += content_piece
+                                elif "message" in choice and "content" in choice["message"]:
+                                    content_piece = choice["message"]["content"]
+                                    if content_piece:
+                                        self.llm_response_accum += content_piece
+                        if "usage" in chunk_json:
+                            self.tokens_usage = get_token_usage(chunk_json)
 
-                    if "error" in chunk_json:
-                        self.llm_response_accum += decoded_chunk
-                        write_log(self.req_headers, self.req_body_str, self.llm_response_accum, self.tokens_usage)
+                        if "error" in chunk_json:
+                            self.llm_response_accum += decoded_chunk
+                            write_log(self.req_headers, self.req_body_str, self.llm_response_accum, self.tokens_usage)
+                    except Exception as ex:
+                        logging.error(f"ChatLogging: error processing chunk part: {decoded_chunk}: {ex}", exc_info=True)
             except Exception as ex:
                 logging.error(f"ChatLogging: error processing chunk: {chunk}: {ex}", exc_info=True)
-                pass  # errors here must be ignored so the chunk can be streamed
 
             self.queue.task_done()
 

@@ -42,7 +42,7 @@ def configure_logging():
         },
         'root': {
             'handlers': ['console', 'file'],
-            'level': 'DEBUG'
+            'level': 'INFO'
         },
         'loggers': {
             'httpcore': {
