@@ -1,19 +1,35 @@
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+:root {
+    --container-margin-vertical: 20px; /* 10px top + 10px bottom */
+}
+
+html, body {
+    height: 100%;
     margin: 0;
     padding: 0;
+    overflow: hidden; /* Prevent body scrollbar due to flex layout */
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background-color: #f4f7f9;
     color: #333;
     line-height: 1.6;
+    display: flex; /* Enable flex container */
+    flex-direction: column; /* Stack children vertically */
 }
 
 .container {
-    max-width: 1000px;
-    margin: 10px auto;
-    padding: 0px 10px 0px 10px;
+    width: 70vw; /* Adjusted to 70% of browser width */
+    margin: 10px auto; /* Use var for consistency */
+    padding: 0 10px;
     background-color: #fff;
     border-radius: 8px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    flex: 1; /* Allow container to grow and shrink */
+    display: flex; /* Enable flex container for its children */
+    flex-direction: column; /* Stack children vertically */
+    min-height: calc(100vh - var(--container-margin-vertical)); /* Ensure container uses available viewport height */
+    box-sizing: border-box; /* Include padding in height calculation */
 }
 
 h1 {
@@ -21,12 +37,14 @@ h1 {
     text-align: center;
     margin: 5px;
     font-weight: 600;
+    flex-shrink: 0; /* Prevent h1 from shrinking */
 }
 
 p {
     text-align: center;
     margin: 5px;
     color: #555;
+    flex-shrink: 0; /* Prevent p from shrinking */
 }
 
 code {
@@ -43,6 +61,7 @@ code {
     display: flex;
     margin-bottom: 15px;
     border-bottom: 2px solid #dee2e6;
+    flex-shrink: 0; /* Prevent tabs from shrinking */
 }
 
 .tab-button {
@@ -68,20 +87,36 @@ code {
 }
 
 /* Editor Content Area Styles */
+/* The div with position: relative, which contains the editor-tab-content */
+/* This element should now correctly flex-grow to fill remaining space */
+div[style*="position:relative"] {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Important for flex items contained in a column flex */
+    box-sizing: border-box;
+    padding-bottom: 10px; /* Add some padding so content doesn't touch save button margin */
+}
+
+
 .editor-tab-content {
     border: 1px solid #ddd;
     border-radius: 5px;
-    margin-bottom: 10px;
-    height: 500px; /* Default height, CodeMirror will manage its own height */
+    /* margin-bottom: 10px; Removed, as parent div has padding-bottom */
+    flex: 1; /* Allow editor content to grow and shrink */
+    display: flex; /* Make it a flex container for CodeMirror */
+    min-height: 0; /* Allow the editor content to shrink */
+    box-sizing: border-box;
 }
 
 .editor-tab-content.active {
-    display: block;
+    display: flex; /* Changed from block to flex for proper layout */
+    flex-direction: column;
 }
 
 /* CodeMirror specific styling */
 .CodeMirror {
-    height: 500px; /* Ensure CodeMirror takes up the container height */
+    height: 100%; /* Ensure CodeMirror takes up the container height */
     border-radius: 4px;
     font-size: 14px;
 }
@@ -98,7 +133,9 @@ code {
     font-size: 16px;
     font-weight: 500;
     transition: background-color 0.3s ease;
-    margin-bottom: 15px;
+    margin-bottom: 15px; /* Keep its original margin */
+    flex-shrink: 0; /* Prevent button from shrinking */
+
 }
 
 #saveButton:hover {
@@ -115,6 +152,7 @@ code {
     border-radius: 4px;
     text-align: center;
     font-weight: 500;
+    flex-shrink: 0; /* Prevent message area from shrinking */
 }
 
 #messageArea.success {
@@ -151,6 +189,7 @@ code {
     top:  10px;
     right: 24px;
     z-index: 10000;
+    flex-shrink: 0; /* Prevent controls from shrinking */
 }
 
 .controls label {
