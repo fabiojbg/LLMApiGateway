@@ -70,6 +70,7 @@ class ChunkProcessorThread(threading.Thread):
         self._stop_event = threading.Event()
 
     def run(self):
+        buffer = ""
         while not self._stop_event.is_set() or self.queue.empty() is False:
             try:
                 chunk = self.queue.get(timeout=5)  # wait max 5 seconds for a chunk before ending
@@ -77,8 +78,14 @@ class ChunkProcessorThread(threading.Thread):
                 break
 
             try:
-                chunks = [chunk_part for chunk_part in chunk.decode('utf-8').split("\n\n") if chunk_part.strip()]
-                for decoded_chunk in chunks:
+                #chunks = [chunk_part for chunk_part in chunk.decode('utf-8').split("\n\n") if chunk_part.strip()]
+                text = chunk.decode('utf-8')
+                buffer += text
+                parts = buffer.split("\n\n")
+                # Keep the last part in buffer if incomplete
+                buffer = parts.pop() if not buffer.endswith("\n\n") else ""
+
+                for decoded_chunk in parts:
                     try:
                         if not decoded_chunk.startswith("data: {") and \
                         not decoded_chunk.startswith("{"):  # ignore if it is not a json

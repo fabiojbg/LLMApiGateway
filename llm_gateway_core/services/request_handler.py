@@ -29,11 +29,16 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
                          error_in_stream = True 
                          return # Stop the generator
 
+                    buffer = ""
                     # Stream the response
                     async for chunk in response.aiter_bytes():
                         try:
-                            chunks =  [chunk_part for chunk_part in chunk.decode('utf-8').split("\n\n") if chunk_part.strip()] 
-                            for chunk_str in chunks:
+                            text = chunk.decode('utf-8')
+                            buffer += text
+                            parts = buffer.split("\n\n")
+                            # Keep the last part in buffer if incomplete
+                            buffer = parts.pop() if not buffer.endswith("\n\n") else ""
+                            for chunk_str in parts:
                                 if not chunk_str.startswith("data: {"): 
                                     logging.debug(f"Passing dummy chunk through: {chunk_str[:1000]}...")
                                     continue
@@ -55,10 +60,11 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
                         if chunk:
                             yield chunk
                         else: 
-                            logging.debug(f"Skipping empty chunk received from {target_url}")                           
+                            logging.debug(f"Skipping empty chunk received from {target_url}")
 
             gen = stream_generator()
             first_content_chunk_candidate = None
+            buffer = ""
             # Prime until the first real data chunk
             while True:
                 try:
@@ -66,7 +72,14 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
                 except StopAsyncIteration:
                     break
                 try:
-                    parts = [p for p in chunk.decode('utf-8').split("\n\n") if p.strip()]
+                    #parts = [p for p in chunk.decode('utf-8').split("\n\n") if p.strip()]
+                    
+                    text = chunk.decode('utf-8')
+                    buffer += text
+                    parts = buffer.split("\n\n")
+                    # Keep the last part in buffer if incomplete
+                    buffer = parts.pop() if not buffer.endswith("\n\n") else ""
+
                     real_found = False
                     for part in parts:
                         if part.startswith("data: {"):
@@ -94,13 +107,19 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
                     logging.debug(f"Yielding first real chunk from {target_url}: {first_content_chunk_candidate[:1000]}...")
                     yield first_content_chunk_candidate
                     # Yield the rest
+                buffer = ""
                 async for chunk in gen:
                     try:
-                        chunks =  [chunk_part for chunk_part in chunk.decode('utf-8').split("\n\n") if chunk_part.strip()] 
+                        #chunks =  [chunk_part for chunk_part in chunk.decode('utf-8').split("\n\n") if chunk_part.strip()] 
                         # if( len(chunks) > 1):
                         #     logging.info(f"Multi chunks received...")  
+                        text = chunk.decode('utf-8')
+                        buffer += text
+                        parts = buffer.split("\n\n")
+                        # Keep the last part in buffer if incomplete
+                        buffer = parts.pop() if not buffer.endswith("\n\n") else ""
 
-                        for chunk_str in chunks:
+                        for chunk_str in parts:
                             #print(f".", end='')  # indicates some chunk is being processed
                             if not chunk_str.startswith("data: {"):
                                 continue
@@ -119,7 +138,7 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
                                 if "usage" in chunk_json:
                                     tokens_usage = chunk_json.get("usage")
                             except Exception as e:
-                                logging.warning(f"CombinedGenerator: Could not decode chunk part. Skipping part. Error={e}. Chunk_part={chunk_str}")
+                                logging.warning(f"CombinedGenerator: Could not decode chunk part. Skipping part. Error={e}. Chunk_part={chunk_str}", exc_info=True)
 
                     except Exception as e:
                         logging.warning(f"CombinedGenerator: Could not decode chunk. Skipping content check for this chunk. Error={e}. Chunk={chunk}")
@@ -127,7 +146,7 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
                     logging.debug(f"Yielding chunk from {target_url}: {chunk[:1000]}...")  
                     yield chunk
 
-                logging.debug(f"Finished streaming from {target_url}. Token Usage: {tokens_usage if tokens_usage else ''}")
+                logging.info(f"Finished streaming from {target_url}. Token Usage: {tokens_usage if tokens_usage else ''}")
 
             return StreamingResponse(
                 combined_generator(),
