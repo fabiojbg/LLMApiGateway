@@ -21,6 +21,7 @@ def write_log(req_headers, req_body_str, llm_response_accum, tokens_usage):
         log_time = datetime.now()
         filename = log_time.strftime("%Y-%m-%d_%H-%M-%S") + (".%03d" % (log_time.microsecond // 1000)) + ".txt"
         division_line = "-" * 100
+        provider = f"Provider: {tokens_usage['provider']}\n\n" if "provider" in tokens_usage else ""
         log_content = (
             f"{division_line}\nTokens Usage:\n-{division_line}\n\n"
                 f"Input: {tokens_usage['prompt_tokens']}\n"
@@ -28,7 +29,8 @@ def write_log(req_headers, req_body_str, llm_response_accum, tokens_usage):
                 f"Cached: {tokens_usage['cached_tokens']}\n"
                 f"Reasoning: {tokens_usage['reasoning_tokens']}\n"
                 f"Total: {tokens_usage['total_tokens']}\n"
-                f"Cost: ${tokens_usage['cost']:0.6f}\n\n"
+                f"Cost: ${tokens_usage['cost']:0.6f}\n"
+                f"{provider}"
             f"{division_line}\nRequest Headers:\n{division_line}\n\n{pformat(req_headers, indent=2)}\n\n"
             f"{division_line}\nRequest Body:\n-{division_line}\n\n{req_body_str}\n\n"
             f"{division_line}\nLLM Response:\n{division_line}\n\n{llm_response_accum}"
@@ -222,9 +224,10 @@ def get_token_usage(chunk_data):
             if "prompt_tokens_details" in usage and \
             "cached_tokens" in usage["prompt_tokens_details"]:
                 tokens_usage["cached_tokens"] = usage["prompt_tokens_details"]["cached_tokens"]
-
             if tokens_usage["reasoning_tokens"]>0:
                 tokens_usage["completion_tokens"] = tokens_usage["completion_tokens"] - tokens_usage["reasoning_tokens"]
+        if "provider" in chunk_data:
+            tokens_usage["provider"] = chunk_data["provider"]
     except Exception as ex:
         logging.error(f"ChatLogging: error processing tokens usage: {ex}", exc_info=True)
         pass
