@@ -21,6 +21,7 @@ def write_log(req_headers, req_body_str, llm_response_accum, tokens_usage):
         log_time = datetime.now()
         filename = log_time.strftime("%Y-%m-%d_%H-%M-%S") + (".%03d" % (log_time.microsecond // 1000)) + ".txt"
         division_line = "-" * 100
+        model = f"Model: {tokens_usage['model']}\n" if "model" in tokens_usage else ""
         provider = f"Provider: {tokens_usage['provider']}\n\n" if "provider" in tokens_usage else ""
         log_content = (
             f"{division_line}\nTokens Usage:\n-{division_line}\n\n"
@@ -30,6 +31,7 @@ def write_log(req_headers, req_body_str, llm_response_accum, tokens_usage):
                 f"Reasoning: {tokens_usage['reasoning_tokens']}\n"
                 f"Total: {tokens_usage['total_tokens']}\n"
                 f"Cost: ${tokens_usage['cost']:0.6f}\n"
+                f"{model}"
                 f"{provider}"
             f"{division_line}\nRequest Headers:\n{division_line}\n\n{pformat(req_headers, indent=2)}\n\n"
             f"{division_line}\nRequest Body:\n-{division_line}\n\n{req_body_str}\n\n"
@@ -228,6 +230,8 @@ def get_token_usage(chunk_data):
                 tokens_usage["completion_tokens"] = tokens_usage["completion_tokens"] - tokens_usage["reasoning_tokens"]
         if "provider" in chunk_data:
             tokens_usage["provider"] = chunk_data["provider"]
+        if "model" in chunk_data:
+            tokens_usage["model"] = chunk_data["model"]
     except Exception as ex:
         logging.error(f"ChatLogging: error processing tokens usage: {ex}", exc_info=True)
         pass
