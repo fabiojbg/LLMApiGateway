@@ -11,16 +11,18 @@
   
 </div>
 <br>
-
-Stop having API call failures to your LLM models, no matter which provider you are using.
-This project can replace providers to give you an almost foolproof LLM model provider. This personal LLM Gateway works locally as an OpenAI-compatible LLM API provider with advanced fallback support for models in case of response failures.
+ 
+This project is a personal LLM Gateway that allows developers to use LLMs from different LLM providers with features like fault tolerance, model load balancing, customized model requests, call retries, and more.
+The LLM Gateway works locally as an OpenAI-compatible LLM API provider with advanced fallback support for models in case of response failures.
 Use it with code agents like Cline, RooCode, or even with your applications as a regular OpenAI API-compatible LLM provider.
 
 ## Features
 
-- **Fault Tolerance**: Automatically falls back to alternative models if the primary model fails
-- **Model Rotation**: Optionally rotates through available models for each API key, distributing load and cost across providers
-- **Flexible Configuration**: Configure fallback sequences and rotation settings per model
+- **Fault Tolerance**: Automatically falls back to alternative models if the primary model fails.
+- **OpenRouter Provider Ordering**: Define the order of the providers routed by OpenRouter.
+- **Model Rotation**: Optionally rotates through available models for each API key, distributing load and cost across providers.
+- **Flexible Configuration**: Configure fallback sequences and rotation settings per model.
+- **Custom LLM Parameters**: Configure custom request parameters for any LLM model.
 
 ## Using with Cline
 Once set, you can use it with any local tool that supports services with OpenAI Compatible APIs, like **Cline** and **RooCode**. You just need to configure it as an OpenAI-compatible provider. Here is an example of using this gateway with Cline, set to use the model `'llmgateway/free-stack'`, which only uses models free of charge, as configured in the example above.
