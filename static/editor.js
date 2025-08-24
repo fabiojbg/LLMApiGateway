@@ -24,10 +24,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updateDarkModeIcon() {
         if (bodyElement.classList.contains('dark-mode')) {
-            darkModeToggle.innerHTML = '<span class="icon-placeholder">☀️</span>'; // Sun icon for light mode
+            //darkModeToggle.innerHTML = '<span class="icon-placeholder">☀️</span>'; // Sun icon for light mode
             darkModeToggle.setAttribute('aria-label', 'Switch to light mode');
         } else {
-            darkModeToggle.innerHTML = '<span class="icon-placeholder">🌙</span>'; // Moon icon for dark mode
+            //darkModeToggle.innerHTML = '<span class="icon-placeholder">🌙</span>'; // Moon icon for dark mode
             darkModeToggle.setAttribute('aria-label', 'Switch to dark mode');
         }
     }

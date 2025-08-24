@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Gateway - Usage Statistics</title>
+    <link rel="stylesheet" href="/static/usage-stats.css">
+</head>
+<body>
+    <div style="position: absolute; width: 100%;z-index:1000">
+    <nav class="navbar">
+        <a href="/v1/ui/rules-editor" class="nav-button">Rules Editor</a>
+    <button id="darkModeToggle" aria-label="Toggle dark mode">
+        <span class="icon-placeholder"></span>
+    </button>
+    </nav>
+    </div>
+    <div class="container">
+        <h1>LLM Gateway - Usage Statistics</h1>
+
+        <div class="tabs">
+            <button class="tab-button active" data-tab="stats">Usage Statistics</button>
+            <button class="tab-button" data-tab="records">Usage Records</button>
+        </div>
+
+        <div id="statsTabContent" class="tab-content active">
+            <div class="controls">
+                <label for="periodSelector">Group by:</label>
+                <select id="periodSelector">
+                    <option value="hour">Hour</option>
+                    <option value="day" selected>Day</option>
+                    <option value="week">Week</option>
+                    <option value="month">Month</option>
+                </select>
+                <button id="refreshButton">Refresh</button>
+            </div>
+            <div id="statsArea">
+                <!-- Statistics tables will be rendered here by JavaScript -->
+                <p>Select a period and click 'Refresh' to view statistics.</p>
+            </div>
+        </div>
+
+        <div id="recordsTabContent" class="tab-content">
+            <div class="records-header">
+                <h2>Latest Usage Records</h2>
+                <div class="pagination-controls">
+                    <button id="prevPage">Previous</button>
+                    <span id="pageInfo">Page 1</span>
+                    <button id="nextPage">Next</button>
+                </div>
+            </div>
+            <div id="recordsArea">
+                <!-- Usage records table will be rendered here by JavaScript -->
+                <p>Loading usage records...</p>
+            </div>
+        </div>
+        <div id="messageArea"></div>
+    </div>
+
+    <script src="/static/usage-stats.js"></script>
+</body>
+</html>

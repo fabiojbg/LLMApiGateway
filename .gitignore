@@ -116,6 +116,7 @@ llmgateway/
 logs/
 uv.lock
 db/llmgateway_rotation.db
+db/tokens_usage.db
 
 # Spyder project settings
 .spyderproject

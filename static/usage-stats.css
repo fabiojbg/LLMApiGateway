@@ -1,0 +1,361 @@
+/* Basic styles for the HTML page */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;    
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f4f4; /* Light mode default */
+    color: #333; /* Light mode default */
+    transition: background-color 0.3s, color 0.3s;
+}
+
+/* Dark mode styles for body */
+body.dark-mode {
+    background-color: #1C2833; /* Dark background for the page */
+    color: #e0e0e0; /* Light text for dark mode */
+}
+
+.container {
+    max-width: 1300px;
+    margin: 0 auto;
+    background-color: #fff; /* Light mode default */
+    padding: 10px 20px 30px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    position: relative;
+    transition: background-color 0.3s, box-shadow 0.3s;
+    z-index: auto;
+}
+
+body.dark-mode .container {
+    background-color: #111827; /* Darker background for the container */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); /* Adjusted shadow for dark mode */
+}
+
+h1 {
+    text-align: center;
+    color: #333; /* Light mode default */
+    margin-bottom: 25px;
+    margin-top: 5px;
+}
+
+/* Navbar specific styles (copied from editor.css but adapted for usage-stats context if needed) */
+.navbar {
+    display: flex;
+    justify-content: flex-end; /* Align to the left */
+    padding: 0 50px 10px 0;
+    margin: 0 10px 0 10px;
+    border-bottom: 1px solid #eee; /* Subtle separator */
+    z-index: 1000 !important;
+}
+
+.navbar .nav-button {
+    background-color: #007bff;
+    color: white;
+    padding: 8px 15px;
+    border-radius: 5px;
+    text-decoration: none; /* Remove underline */
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+}
+
+.navbar .nav-button:hover {
+    background-color: #0056b3;
+}
+
+body.dark-mode .navbar {
+    border: none;
+}
+
+body.dark-mode .navbar .nav-button {
+    background-color: #007acc;
+}
+
+body.dark-mode .navbar .nav-button:hover {
+    background-color: #005fa3;
+}
+
+body.dark-mode h1 {
+    color: #e0e0e0; /* Dark mode color */
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+
+.controls label {
+    font-weight: bold;
+    color: #333; /* Light mode default */
+}
+
+body.dark-mode .controls label {
+    color: #e0e0e0; /* Dark mode color */
+}
+
+select, button {
+    padding: 10px 15px;
+    border-radius: 5px;
+    border: 1px solid #ddd; /* Light mode default */
+    background-color: #007bff; /* Light mode default */
+    color: #fff;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+body.dark-mode select, body.dark-mode button {
+    border: 1px solid #555; /* Dark mode color */
+    background-color: #1e88e5; /* Dark mode color */
+}
+
+select {
+    background-color: #fff; /* Light mode default */
+    color: #333; /* Light mode default */
+}
+
+body.dark-mode select {
+    background-color: #3a3a3a; /* Dark mode color */
+    color: #e0e0e0; /* Dark mode color */
+}
+
+button:hover {
+    background-color: #0056b3; /* Light mode default */
+}
+
+body.dark-mode button:hover {
+    background-color: #1565c0; /* Dark mode color */
+}
+
+#darkModeToggle {
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none; /* Align with editor.css */
+    border: 1px solid #ccc; /* Light mode default */
+    color: #333; /* Icon color for light mode */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Keep shadow for consistency with container shadow */
+    padding: 0;
+    margin-left: 10px;
+    margin-right: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; /* Add transition */
+}
+
+#darkModeToggle .icon-placeholder {
+    display: inline-block;
+    mask-size: auto; /* Remove mask-size */
+    background-color: transparent; /* Remove background-color for icon itself */
+}
+
+
+.icon-placeholder
+{
+    width:35px;
+    height: 30px;
+}
+
+#darkModeToggle .icon-placeholder::before {
+    content: '🌙'; /* Moon icon for dark mode */
+    font-size: 20px; /* Match editor.css */
+}
+
+body.dark-mode #darkModeToggle .icon-placeholder::before {
+    content: '☀️'; /* Sun icon for light mode */
+}
+
+#darkModeToggle:hover {
+    background-color: #f0f0f0; /* Light hover effect, match editor.css */
+}
+
+/* Dark Mode Toggle Button in Dark Mode */
+body.dark-mode #darkModeToggle {
+    background: none;
+    border: 1px solid #555; /* Darker border */
+    color: #e0e0e0; /* Icon color for dark mode */
+}
+
+body.dark-mode #darkModeToggle:hover {
+    background-color: #3a3a3a; /* Darker hover effect */
+}
+
+
+#statsArea h2 {
+    color: #333; /* Light mode default */
+    margin-top: 30px;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #ddd; /* Light mode default */
+    padding-bottom: 10px;
+    text-align: center;
+}
+
+body.dark-mode #statsArea h2 {
+    color: #e0e0e0; /* Dark mode color */
+    border-bottom: 1px solid #555; /* Dark mode color */
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+th, td {
+    padding: 12px 15px;
+    border: 1px solid #ddd; /* Light mode default */
+    text-align: left;
+    white-space: nowrap; /* Prevent text wrapping in table headers/cells */
+}
+
+body.dark-mode th, body.dark-mode td {
+    border: 1px solid #555; /* Dark mode color */
+}
+
+th {
+    background-color: #e9ecef; /* Light mode default */
+    font-weight: bold;
+    color: #333; /* Light mode default */
+}
+
+body.dark-mode th {
+    background-color: #1b3651; /* Dark mode color */
+    color: #e0e0e0; /* Dark mode color */
+}
+
+tr:nth-child(even) {
+    background-color: #f4f4f4; /* Light mode default */
+}
+
+body.dark-mode tr:nth-child(even) {
+    background-color: #102133; /* Dark mode color */
+}
+
+tr:hover {
+    background-color: #f2f2f2; /* Light mode default */
+}
+
+body.dark-mode tr:hover {
+    background-color: #444; /* Dark mode color */
+}
+
+#messageArea {
+    margin-top: 20px;
+    padding: 10px;
+    border-radius: 5px;
+    min-height: 20px;
+    text-align: center;
+}
+
+.error {
+    background-color: #ffe0e0;
+    color: #cc0000;
+    border: 1px solid #cc0000;
+}
+
+body[data-theme="dark"] .error {
+    background-color: #6a1a1a;
+    color: #ff9999;
+    border-color: #ff9999;
+}
+
+/* Tab styles */
+.tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.tab-button {
+    padding: 10px 20px;
+    border: none;
+    background-color: #e0e0e0;
+    color: #333;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s, color 0.3s;
+    border-radius: 5px 5px 0 0;
+    margin: 0 2px;
+}
+
+.tab-button:hover {
+    background-color: #d0d0d0;
+}
+
+.tab-button.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.tab-button.active:hover {
+    background-color: #0056b3;
+}
+
+body.dark-mode .tab-button {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+}
+
+body.dark-mode .tab-button:hover {
+    background-color: #4a4a4a;
+}
+
+body.dark-mode .tab-button.active {
+    background-color: #1e88e5;
+    color: white;
+}
+
+body.dark-mode .tab-button.active:hover {
+    background-color: #1565c0;
+}
+
+.tab-content {
+    display: none;
+    padding-top: 20px; /* Add padding to separate content from tabs */
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Usage Records specific styles */
+.records-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.records-header h2 {
+    margin: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+    text-align: left;
+}
+
+.pagination-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.pagination-controls button {
+    padding: 8px 12px;
+    font-size: 14px;
+}
+
+#pageInfo {
+    font-weight: bold;
+    color: #333;
+}
+
+body.dark-mode #pageInfo {
+    color: #e0e0e0;
+}
+
+#recordsArea {
+    /* Styles can be similar to #statsArea tables, but ensure they don't conflict */
+}

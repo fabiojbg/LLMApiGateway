@@ -14,6 +14,13 @@
         }
     },
     {
+        "deepseek":
+        {
+            "baseUrl" : "https://api.deepseek.com/v1",            
+            "apikey" : "APIKEY_DEEPSEEK"
+        }
+    },
+    {
         "google":
         {
             "baseUrl" : "https://generativelanguage.googleapis.com/v1beta/openai",            

@@ -1,11 +1,11 @@
 :root {
-    --container-margin-vertical: 20px; /* 10px top + 10px bottom */
+    --container-margin-vertical: 40px; /* 10px top + 10px bottom */
 }
 
 html, body {
     height: 100%;
     margin: 0;
-    padding: 0;
+    padding: 10px;
     overflow: hidden; /* Prevent body scrollbar due to flex layout */
 }
 
@@ -20,7 +20,7 @@ body {
 
 .container {
     width: 70vw; /* Adjusted to 70% of browser width */
-    margin: 10px auto; /* Use var for consistency */
+    margin: 0 auto; /* Use var for consistency */
     padding: 0 10px;
     background-color: #fff;
     border-radius: 8px;
@@ -28,7 +28,7 @@ body {
     flex: 1; /* Allow container to grow and shrink */
     display: flex; /* Enable flex container for its children */
     flex-direction: column; /* Stack children vertically */
-    min-height: calc(100vh - var(--container-margin-vertical)); /* Ensure container uses available viewport height */
+    max-height: calc(100vh - var(--container-margin-vertical)); /* Ensure container uses available viewport height */
     box-sizing: border-box; /* Include padding in height calculation */
 }
 
@@ -36,8 +36,43 @@ h1 {
     color: #2c3e50;
     text-align: center;
     margin: 5px;
-    font-weight: 600;
     flex-shrink: 0; /* Prevent h1 from shrinking */
+}
+
+/* Navbar specific styles */
+.navbar {
+    display: flex;
+    justify-content: flex-end; /* Align to the left */
+    padding: 0 50px 10px 0;
+    margin: 0 10px 0 10px;
+    border-bottom: 1px solid #eee; /* Subtle separator */
+    z-index: 1000;
+}
+
+.navbar .nav-button {
+    background-color: #007bff;
+    color: white;
+    padding: 6px 15px;
+    border-radius: 5px;
+    text-decoration: none; /* Remove underline */
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+}
+
+.navbar .nav-button:hover {
+    background-color: #0056b3;
+}
+
+body.dark-mode .navbar {
+    border-bottom: none;
+}
+
+body.dark-mode .navbar .nav-button {
+    background-color: #007acc;
+}
+
+body.dark-mode .navbar .nav-button:hover {
+    background-color: #005fa3;
 }
 
 p {
@@ -147,7 +182,8 @@ div[style*="position:relative"] {
 }
 
 #messageArea {
-    margin-top: 15px;
+    margin-top: 5px;
+    margin-bottom: 5px;
     padding: 10px;
     border-radius: 4px;
     text-align: center;
@@ -215,26 +251,33 @@ div[style*="position:relative"] {
 
 /* Dark Mode Toggle Button */
 #darkModeToggle {
-    position: absolute;
-    top: 20px; /* Adjusted for better spacing */
-    right: 20px; /* Adjusted for better spacing */
-    background: none;
-    border: 1px solid #ccc; /* Subtle border */
-    color: #333; /* Icon color for light mode */
-    cursor: pointer;
-    padding: 8px; /* Slightly larger padding */
-    border-radius: 50%; /* Circular button */
-    width: 40px; /* Fixed width */
-    height: 40px; /* Fixed height */
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    background: none; /* Align with editor.css */
+    border: 1px solid #ccc; /* Light mode default */
+    color: #333; /* Icon color for light mode */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Keep shadow for consistency with container shadow */
+    padding: 0;
+    margin-left: 10px;
+    margin-right: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; /* Add transition */
+}
+.icon-placeholder
+{
+    width:35px;
+
 }
 
 #darkModeToggle .icon-placeholder::before {
-    content: '☀️'; /* Sun icon for light mode */
+    content: '🌙'; /* Moon icon for dark mode */
     font-size: 20px;
+}
+
+body.dark-mode #darkModeToggle .icon-placeholder::before {
+    content: '☀️'; /* Sun icon for light mode */
 }
 
 #darkModeToggle:hover {
@@ -243,12 +286,12 @@ div[style*="position:relative"] {
 
 /* Dark Mode Styles */
 body.dark-mode {
-    background-color: #1e1e1e; /* Dark background for the page */
+    background-color: #1C2833; /* Dark background for the page */
     color: #e0e0e0; /* Light text for dark mode */
 }
 
 body.dark-mode .container {
-    background-color: #2c2c2c; /* Darker background for the container */
+    background-color: #111827; /* Darker background for the container */
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); /* Adjusted shadow for dark mode */
     border: 1px solid #444; /* Subtle border for container in dark mode */
 }
@@ -341,10 +384,6 @@ body.dark-mode #darkModeToggle {
     background: none;
     border: 1px solid #555; /* Darker border */
     color: #e0e0e0; /* Icon color for dark mode */
-}
-
-body.dark-mode #darkModeToggle .icon-placeholder::before {
-    content: '🌙'; /* Moon icon for dark mode */
 }
 
 body.dark-mode #darkModeToggle:hover {

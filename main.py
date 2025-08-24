@@ -15,6 +15,8 @@ from llm_gateway_core.middleware.auth import api_key_auth # Functional middlewar
 from llm_gateway_core.middleware.chat_logging import log_chat_completions # Functional middleware
 from llm_gateway_core.api.v1 import router as api_v1_router
 from llm_gateway_core.api.v1.rules_editor import editor_router as api_v1_editor_router # Import the new editor router
+from llm_gateway_core.api.v1.stats import stats_router as api_v1_stats_router # Import the new stats router
+from llm_gateway_core.db.tokens_usage_db import TokensUsageDB # Import TokensUsageDB
 
 # --- Application Setup ---
 
@@ -32,7 +34,12 @@ async def lifespan(app: FastAPI):
     config_loader.load_providers()
     config_loader.load_fallback_rules()
     app.state.config_loader = config_loader
-    logger.info("Configurations loaded and ConfigLoader attached to app.state.")
+    logger.info("Service configurations loaded and ConfigLoader attached to app.state.")
+
+    # Initialize TokensUsageDB
+    tokens_usage_db = TokensUsageDB()
+    app.state.tokens_usage_db = tokens_usage_db
+    logger.info("TokensUsageDB initialized and attached to app.state.")
 
     # Initialize other resources here if needed
     # Example: await database.connect()
@@ -87,6 +94,8 @@ else:
 app.include_router(api_v1_router, prefix="/v1")
 # Include the v1 editor API router, also under /v1 prefix
 app.include_router(api_v1_editor_router, prefix="/v1", tags=["Config Editor"])
+# Include the v1 stats API router, also under /v1 prefix
+app.include_router(api_v1_stats_router, prefix="/v1", tags=["Usage Stats"])
 
 # --- Static Files ---
 app.mount("/static", StaticFiles(directory=str(STATIC_FILES_DIR)), name="static")

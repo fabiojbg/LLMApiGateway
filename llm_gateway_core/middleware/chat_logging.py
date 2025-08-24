@@ -12,8 +12,12 @@ import threading
 import queue
 import json5
 import time
+from ..db.tokens_usage_db import TokensUsageDB
 
 logger = logging.getLogger(__name__)
+
+# Initialize tokens usage database
+tokens_usage_db = TokensUsageDB()
 
 def write_log(req_headers, req_body_str, llm_response_accum, tokens_usage):
     try:
@@ -44,6 +48,12 @@ def write_log(req_headers, req_body_str, llm_response_accum, tokens_usage):
         with open(log_path, "w", encoding="utf-8") as f:
             log_content = log_content.replace("\\n\\n", "\r\n\r\n").replace("\\n", "\r\n")  # replace the sequence \n inside json elements to make it more readable
             f.write(log_content)
+
+        # Insert token usage data into database
+        try:
+            tokens_usage_db.insert_usage(tokens_usage)
+        except Exception as db_error:
+            logger.error(f"Failed to insert token usage data into database: {db_error}", exc_info=True)
 
         # Clean up old logs if over limit
         log_files = sorted(glob.glob(os.path.join("./logs", "*.txt")), key=os.path.getmtime)
@@ -206,7 +216,7 @@ def get_token_usage(chunk_data):
         "completion_tokens": 0,
         "total_tokens": 0,
         "reasoning_tokens" : 0,
-        "cached_tokes": 0,
+        "cached_tokens": 0,
         "cost": 0
     }
     try:       

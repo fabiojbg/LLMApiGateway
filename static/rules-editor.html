@@ -15,11 +15,15 @@
     <link rel="stylesheet" href="/static/editor.css">
 </head>
 <body>
+    <div style="position: absolute; width: 100%;">
+        <nav class="navbar">
+            <a href="/v1/ui/usage-stats" class="nav-button">Usage Statistics</a>
+            <button id="darkModeToggle" aria-label="Toggle dark mode">
+                <span class="icon-placeholder"></span>
+            </button>
+        </nav>
+    </div>    
     <div class="container">
-        <button id="darkModeToggle" aria-label="Toggle dark mode">
-            <!-- Icon will be handled by CSS/JS -->
-            <span class="icon-placeholder"></span>
-        </button>
         <h1>LLM Gateway - Configuration Editor</h1>
 
         <div class="tabs">
