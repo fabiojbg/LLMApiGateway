@@ -72,8 +72,6 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
                 except StopAsyncIteration:
                     break
                 try:
-                    #parts = [p for p in chunk.decode('utf-8').split("\n\n") if p.strip()]
-                    
                     text = chunk.decode('utf-8')
                     buffer += text
                     parts = buffer.split("\n\n")
@@ -110,9 +108,6 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
                 buffer = ""
                 async for chunk in gen:
                     try:
-                        #chunks =  [chunk_part for chunk_part in chunk.decode('utf-8').split("\n\n") if chunk_part.strip()] 
-                        # if( len(chunks) > 1):
-                        #     logging.info(f"Multi chunks received...")  
                         text = chunk.decode('utf-8')
                         buffer += text
                         parts = buffer.split("\n\n")

@@ -67,10 +67,11 @@ def write_log(req_headers, req_body_str, llm_response_accum, tokens_usage):
         logger.error(f"Failed to write chat log: {e}", exc_info=True)
 
 class ChunkProcessorThread(threading.Thread):
-    def __init__(self, req_headers, req_body_str):
+    def __init__(self, req_headers, req_body_str, is_real_streaming):
         super().__init__()
         self.req_headers = req_headers
         self.req_body_str = req_body_str
+        self.is_real_streaming = is_real_streaming
         self.queue = queue.Queue()
         self.llm_response_accum = ""
         self.tokens_usage = {
@@ -85,19 +86,29 @@ class ChunkProcessorThread(threading.Thread):
 
     def run(self):
         buffer = ""
+        parts = [""]
         while not self._stop_event.is_set() or self.queue.empty() is False:
+            if self.is_real_streaming : # for non-streaming, exit if queue is empty
+                try:                
+                    chunk = self.queue.get(timeout=5)  # wait max 5 seconds for a chunk before ending
+                except queue.Empty:
+                    break
+            else:
+                while True:
+                    try:                
+                        chunk = self.queue.get(timeout=2)  # for non-streaming, just get without waiting
+                        buffer += chunk.decode('utf-8')
+                    except queue.Empty:
+                        break
             try:
-                chunk = self.queue.get(timeout=5)  # wait max 5 seconds for a chunk before ending
-            except queue.Empty:
-                break
-
-            try:
-                #chunks = [chunk_part for chunk_part in chunk.decode('utf-8').split("\n\n") if chunk_part.strip()]
-                text = chunk.decode('utf-8')
-                buffer += text
-                parts = buffer.split("\n\n")
-                # Keep the last part in buffer if incomplete
-                buffer = parts.pop() if not buffer.endswith("\n\n") else ""
+                if( not self.is_real_streaming):
+                   parts[0] = buffer
+                else:
+                    text = chunk.decode('utf-8')
+                    buffer += text
+                    parts = buffer.split("\n\n")
+                    # Keep the last part in buffer if incomplete
+                    buffer = parts.pop() if not buffer.endswith("\n\n") else ""
 
                 for decoded_chunk in parts:
                     try:
@@ -107,6 +118,7 @@ class ChunkProcessorThread(threading.Thread):
 
                         if decoded_chunk.startswith("data: "):
                             decoded_chunk = decoded_chunk[len('data: '):].strip()
+                            
                         chunk_json = json5.loads(decoded_chunk)
                         if "choices" in chunk_json:
                             for choice in chunk_json["choices"]:
@@ -130,6 +142,8 @@ class ChunkProcessorThread(threading.Thread):
                 logging.error(f"ChatLogging: error processing chunk: {chunk}: {ex}", exc_info=True)
 
             self.queue.task_done()
+            if( not self.is_real_streaming):
+                break
 
         # After finishing processing all chunks, write the log file
         write_log(self.req_headers, self.req_body_str, self.llm_response_accum, self.tokens_usage)
@@ -163,10 +177,18 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
         return response
 
     response = await call_next(request)
+    logging.debug(f"chat_logging: Response type received by middleware: {type(response)}. Is StreamingResponse check: {isinstance(response, StreamingResponse)}")
 
     try:
         # If response is streaming, wrap its iterator to enqueue chunks for background processing
-        if "StreamingResponse" in type(response).__name__ or isinstance(response, StreamingResponse):
+        # Check if it's a StreamingResponse AND explicitly check Content-Type for actual event-streams
+        # Functional middlewares can sometimes convert JSONResponse into _StreamingResponse,
+        # so we need to differentiate based on content type.
+        is_real_streaming = response.headers.get("content-type") == "text/event-stream"
+        is_streaming_response = isinstance(response, StreamingResponse) or "StreamingResponse" in type(response).__name__
+        if is_streaming_response:
+            
+            logger.debug(f"chat_logging: Handling as actual StreamingResponse (Content-Type: {response.headers.get('content-type')})")
             original_iterator = response.body_iterator
 
             first_chunk = True
@@ -175,7 +197,7 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
                 async for chunk in original_iterator:
                     nonlocal first_chunk
                     if first_chunk : # create the thread to process the chunks
-                        chunk_processor_thread = ChunkProcessorThread(req_headers, req_body_str)
+                        chunk_processor_thread = ChunkProcessorThread(req_headers, req_body_str, is_real_streaming)
                         chunk_processor_thread.start()
                         first_chunk = False
 
