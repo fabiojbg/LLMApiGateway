@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const metrics = [
             'prompt_tokens', 'completion_tokens', 'total_tokens',
-            'reasoning_tokens', 'cached_tokens', 'cost'
+            'reasoning_tokens', 'cached_tokens', 'count', 'cost'
         ];
 
         let html = '';
@@ -58,7 +58,10 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `<table>`;
             html += `<thead><tr><th>Model</th>`;
             metrics.forEach(metric => {
-                html += `<th>${metric.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}</th>`;
+                html += `<th>${metric.replace('_', ' ').split(' ') 
+                          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                          .join(' ')
+                          .replace(' ', '<br>')}</th>`;
             });
             html += `</tr></thead>`;
             html += `<tbody>`;
@@ -157,7 +160,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const headers = Object.keys(data[0]);
         let html = '<table><thead><tr>';
         headers.forEach(header => {
-            html += `<th>${header.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ').replace(' ', '<br>')}</th>`;
+            html += `<th>${header.replace('_', ' ').split(' ')
+                                 .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                 .join(' ')
+                                 .replace(' ', '<br>')}</th>`;
         });
         html += '</tr></thead><tbody>';
 

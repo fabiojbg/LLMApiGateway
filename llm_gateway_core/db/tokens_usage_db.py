@@ -274,7 +274,8 @@ class TokensUsageDB:
                 SUM(total_tokens) as total_tokens,
                 SUM(reasoning_tokens) as reasoning_tokens,
                 SUM(cached_tokens) as cached_tokens,
-                SUM(cost) as cost
+                SUM(cost) as cost,
+                COUNT(*) as count
             FROM
                 tokens_usage
             {where_clause}
