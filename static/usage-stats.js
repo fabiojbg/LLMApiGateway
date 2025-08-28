@@ -148,6 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const recordsArea = document.getElementById('recordsArea');
     const prevPageButton = document.getElementById('prevPage');
     const nextPageButton = document.getElementById('nextPage');
+    const recordRefreshButton = document.getElementById('recordRefreshButton');
     const pageInfoSpan = document.getElementById('pageInfo');
     const recordsPerPage = 25; // As per the task description
     let currentPage = 1;
@@ -248,6 +249,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     nextPageButton.addEventListener('click', () => {
         currentPage++; // We will check bounds in updatePaginationControls or based on API response
+        fetchAndRenderRecords();
+    });
+
+    recordRefreshButton.addEventListener('click', () => {
+        currentPage = 1; // Reset to the first page on refresh
         fetchAndRenderRecords();
     });
 
