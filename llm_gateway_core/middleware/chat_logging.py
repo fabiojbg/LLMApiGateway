@@ -88,6 +88,7 @@ class ChunkProcessorThread(threading.Thread):
         buffer = ""
         parts = [""]
         while not self._stop_event.is_set() or self.queue.empty() is False:
+            logging.debug(f"ChunkProcessorThread: isRealStreaming={self.is_real_streaming}, queue size={self.queue.qsize()}")
             if self.is_real_streaming : # for non-streaming, exit if queue is empty
                 try:                
                     chunk = self.queue.get(timeout=5)  # wait max 5 seconds for a chunk before ending
@@ -184,7 +185,7 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
         # Check if it's a StreamingResponse AND explicitly check Content-Type for actual event-streams
         # Functional middlewares can sometimes convert JSONResponse into _StreamingResponse,
         # so we need to differentiate based on content type.
-        is_real_streaming = response.headers.get("content-type") == "text/event-stream"
+        is_real_streaming = "text/event-stream" in response.headers.get("content-type")
         is_streaming_response = isinstance(response, StreamingResponse) or "StreamingResponse" in type(response).__name__
         if is_streaming_response:
             
