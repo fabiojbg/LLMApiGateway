@@ -1,3 +1,4 @@
+
 # Fault-Tolerant Personal LLM Gateway
 ---
 <div align="center" style="text-align: center;">
@@ -15,6 +16,11 @@
 This project is a personal LLM Gateway that allows developers to use LLMs from different LLM providers with features like fault tolerance, model load balancing, customized model requests, call retries, and more.
 The LLM Gateway works locally as an OpenAI-compatible LLM API provider with advanced fallback support for models in case of response failures.
 Use it with code agents like Cline, RooCode, or even with your applications as a regular OpenAI API-compatible LLM provider.
+
+## Changelog
+
+See: [Changelog](CHANGELOG.md)
+
 
 ## Features
 
