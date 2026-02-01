@@ -39,8 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const metrics = [
-            'prompt_tokens', 'completion_tokens', 'total_tokens',
-            'reasoning_tokens', 'cached_tokens', 'count', 'cost'
+            'prompt_tokens', 'completion_tokens', 'reasoning_tokens',
+            'total_tokens', 'cached_tokens', 'count', 'cost', 'cost_per_million'
         ];
 
         let html = '';
@@ -58,10 +58,15 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `<table>`;
             html += `<thead><tr><th>Model</th>`;
             metrics.forEach(metric => {
-                html += `<th>${metric.replace('_', ' ').split(' ') 
-                          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                          .join(' ')
-                          .replace(' ', '<br>')}</th>`;
+                let displayMetric = metric.replace('_', ' ').split(' ') 
+                                      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                      .join(' ')
+                                      .replace(' ', '<br>');
+                
+                if (metric === 'cost_per_million') {
+                    displayMetric = 'Cost/Million';
+                }
+                html += `<th>${displayMetric}</th>`;
             });
             html += `</tr></thead>`;
             html += `<tbody>`;
@@ -71,8 +76,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 html += `<td>${row.model || 'N/A'}</td>`;
                 metrics.forEach(metric => {
                     let value = row[metric];
+                    
+                    if (metric === 'cost_per_million') {
+                        const total_cost = row.cost || 0;
+                        const total_tokens = row.total_tokens || 0;
+                        const costPerMillion = total_tokens > 0 ? (total_cost / total_tokens) * 1000000 : 0;
+                        value = costPerMillion.toFixed(4); // Ensures fixed decimal places and converts to string
+                    }
+                    
                     if (metric === 'cost' && typeof value === 'number') {
-                        value = value.toFixed(4); // Format cost to 4 decimal places
+                        value = value.toFixed(4); // Format cost to 4 decimal places and converts to string
                     }
                     html += `<td>${typeof value === 'number' ? value.toLocaleString() : value}</td>`;
                 });
@@ -158,7 +171,22 @@ document.addEventListener('DOMContentLoaded', () => {
             return '<p>No usage records available.</p>';
         }
 
-        const headers = Object.keys(data[0]);
+        // Define preferred order for records table headers
+        const preferredHeaders = [
+            'timestamp', 'model', 'prompt_tokens', 'completion_tokens',
+            'reasoning_tokens', 'total_tokens', 'cached_tokens', 'cost',
+            'provider', 'request_id'
+        ];
+
+        // Use preferred order, but fallback to actual keys if some are missing or extra ones exist
+        const actualKeys = Object.keys(data[0]);
+        const headers = preferredHeaders.filter(key => actualKeys.includes(key));
+        actualKeys.forEach(key => {
+            if (!headers.includes(key) && key !== 'id') {
+                headers.push(key);
+            }
+        });
+
         let html = '<table><thead><tr>';
         headers.forEach(header => {
             html += `<th>${header.replace('_', ' ').split(' ')
