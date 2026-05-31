@@ -32,6 +32,23 @@ See: [Changelog](CHANGELOG.md)
 - **Usage Statistics**: Track the cost and consumption of tokens per hour, day, week, or month.
 
 
+## Getting Started
+
+Before running the gateway, you need to create the configuration files from the provided examples and edit them accordingly:
+
+1.  **Environment Variables**:
+    ```bash
+    cp .env.example .env
+    ```
+2.  **Providers Configuration**:
+    ```bash
+    cp providers.json.example providers.json
+    ```
+3.  **Fallback Rules**:
+    ```bash
+    cp models_fallback_rules.json.example models_fallback_rules.json
+    ```
+
 ## Gateway endpoints
 
   - `/v1/models` - Like v1, just lists available models.

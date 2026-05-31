@@ -8,8 +8,8 @@ This directory contains the Docker implementation for the LLM Gateway project.
 - **docker-compose.yml**: Easy deployment configuration
 - **entrypoint.sh**: Container startup script
 - **healthcheck.py**: Container health monitoring
-- **providers.json.sample**: Template for provider configuration
-- **models_fallback_rules.json.sample**: Template for fallback rules configuration
+- **providers.json.example**: Template for provider configuration (in root)
+- **models_fallback_rules.json.example**: Template for fallback rules configuration (in root)
 - **docker-deployment.md**: Comprehensive deployment guide
 
 ## Getting Started
@@ -19,13 +19,16 @@ This directory contains the Docker implementation for the LLM Gateway project.
    mkdir -p config data/db
    ```
 
-2. Edit the configuration files with your details:
-   - Edit `providers.json` with your provider details
-   - Edit `models_fallback_rules.json` with your fallback rules
+2. Create the configuration files from the provided examples in the root directory:
+   - `cp .env.example .env`
+   - `cp providers.json.example providers.json`
+   - `cp models_fallback_rules.json.example models_fallback_rules.json`
 
-   > **Note:** If these files do not exist on the host, the entrypoint script will automatically generate sensible default versions so the container can start. You can then configure them via the Web UI.
+3. Edit the configuration files with your details before build the image and containers or use the Web UI after deployment.
 
-3. Deploy using Docker Compose:
+   > **Note:** If `providers.json` and `models_fallback_rules.json` do not exist on the host, the entrypoint script will automatically generate sensible default versions so the container can start. You can then configure them via the Web UI.
+
+4. Deploy using Docker Compose:
    ```bash
    docker-compose up -d
    ```

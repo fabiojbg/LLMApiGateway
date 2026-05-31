@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 
-# Print a message about where the logs will be
 echo "LLM Gateway starting..."
 echo "Container logs will be available in the container only and not persisted to host."
 echo "Container database will be persisted to host via volume mount."
@@ -12,38 +11,44 @@ mkdir -p /app/logs
 # Create directory for database if it doesn't exist
 mkdir -p /app/db
 
-# If providers.json doesn't exist, create a default one so the container starts
-# but the user will need to configure their actual providers via the Web UI or manually
-if [ ! -f "/app/providers.json" ]; then
-    echo "WARNING: providers.json not found, creating with default content."
-    echo "Please configure your providers via the Web UI at /v1/ui/rules-editor or mount a custom providers.json."
-    echo '[
-    {
-        "'${FALLBACK_PROVIDER:-openrouter}'": {
-            "baseUrl": "https://openrouter.ai/api/v1",
-            "apikey": "APIKEY_OPENROUTER"
-        }
-    }
-]' > /app/providers.json
+# Flag to track if there are configuration errors
+CONFIG_ERROR=0
+
+# 1. Check if GATEWAY_API_KEY is set (indicates .env is configured)
+if [ -z "${GATEWAY_API_KEY}" ]; then
+    echo "========================================================================"
+    echo " ERROR: GATEWAY_API_KEY environment variable is not set!"
+    echo " Please make sure you have configured your .env file correctly"
+    echo " and that it is being loaded (e.g., via env_file in docker-compose)."
+    echo "========================================================================"
+    CONFIG_ERROR=1
 fi
 
-# If models_fallback_rules.json doesn't exist, create a default one
+# 2. Check if providers.json exists
+if [ ! -f "/app/providers.json" ]; then
+    echo "========================================================================"
+    echo " ERROR: providers.json is missing!"
+    echo " Please copy providers.json.example to providers.json, configure it,"
+    echo " and mount it to the container at /app/providers.json."
+    echo "========================================================================"
+    CONFIG_ERROR=1
+fi
+
+# 3. Check if models_fallback_rules.json exists
 if [ ! -f "/app/models_fallback_rules.json" ]; then
-    echo "models_fallback_rules.json not found, creating with default content."
-    echo '[
-    {
-        "gateway_model_name": "llmgateway/default",
-        "rotate_models": false,
-        "fallback_models": [
-            {
-                "provider": "'${FALLBACK_PROVIDER:-openrouter}'",
-                "model": "openai/gpt-3.5-turbo",
-                "retry_delay": 15,
-                "retry_count": 3
-            }
-        ]
-    }
-]' > /app/models_fallback_rules.json
+    echo "========================================================================"
+    echo " ERROR: models_fallback_rules.json is missing!"
+    echo " Please copy models_fallback_rules.json.example to models_fallback_rules.json,"
+    echo " configure it, and mount it to the container at /app/models_fallback_rules.json."
+    echo "========================================================================"
+    CONFIG_ERROR=1
+fi
+
+# If any configuration is missing, exit immediately
+if [ $CONFIG_ERROR -ne 0 ]; then
+    echo "CRITICAL: LLM Gateway startup failed due to missing configuration files."
+    echo "Please refer to the README.md or docker-deployment.md for setup instructions."
+    exit 1
 fi
 
 # Print some useful information

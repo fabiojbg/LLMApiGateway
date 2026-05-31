@@ -17,20 +17,20 @@ The fastest way to get started is using Docker Compose:
 # 1. Create necessary directories
 mkdir -p config data/db
 
-# 2. Edit the configuration files
-# (you need to customize these files, or use the Web UI Editor at /v1/ui/rules-editor)
-nano providers.json
-nano models_fallback_rules.json
+# 2. Copy and edit the configuration files
+# (you must customize these files before starting the container)
+cp providers.json.example providers.json
+cp models_fallback_rules.json.example models_fallback_rules.json
+cp .env.example .env
 
-# 3. Edit the docker-compose.yml file to set your API keys
-# (you need to customize this file)
-nano docker-compose.yml
+# 3. Edit the .env file to set your API keys
+nano .env
 
 # 4. Start the container
 docker-compose up -d
 ```
 
-> **Note:** If `providers.json` or `models_fallback_rules.json` do not exist on the host, the entrypoint script will automatically generate default versions so the container can start. You can then configure them via the Web UI.
+> **Note:** The container requires `.env`, `providers.json`, and `models_fallback_rules.json` to be present and correctly mounted. If any of these files are missing or unconfigured, the container will fail to start with a clear error message in the logs.
 
 ## Manual Docker Deployment
 
@@ -40,10 +40,9 @@ If you prefer to use Docker CLI directly:
 # 1. Create necessary directories
 mkdir -p config data/db
 
-# 2. Edit the configuration files
-# (you need to customize these files, or use the Web UI Editor at /v1/ui/rules-editor)
-nano providers.json
-nano models_fallback_rules.json
+# 2. Copy and edit the configuration files
+cp providers.json.example providers.json
+cp models_fallback_rules.json.example models_fallback_rules.json
 
 # 3. Build the image
 docker build -t llm-gateway:latest .
@@ -58,7 +57,7 @@ docker run -d \
   -e GATEWAY_API_KEY=your-secure-api-key \
   -e APIKEY_OPENROUTER=your-openrouter-key \
   -e APIKEY_OPENAI=your-openai-key \
-  -e LOG_CHAT_ENABLED=false \
+  -e LOG_CHAT_ENABLED=true \
   -e FALLBACK_PROVIDER=openrouter \
   llm-gateway:latest
 ```
@@ -74,7 +73,7 @@ docker run -d \
 
 - `GATEWAY_PORT`: Port to run the gateway (default: 9100)
 - `LOG_FILE_LIMIT`: Maximum log files to keep (default: 15)
-- `LOG_CHAT_ENABLED`: Enable chat logging (default: false)
+- `LOG_CHAT_ENABLED`: Enable chat logging (default: true)
 - `FALLBACK_PROVIDER`: Default fallback provider (default: openrouter)
 
 ### Provider API Keys

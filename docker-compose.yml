@@ -19,7 +19,7 @@ services:
       - ./models_fallback_rules.json:/app/models_fallback_rules.json
       # Mount database directory for persistence
       - ./data/db:/app/db
-    # environment:
+    # environment: //  # You can also set environment variables directly here instead of using the .env file
     #   # Required
     #   - GATEWAY_API_KEY=your-secure-api-key (you can make this up)
     # 
