@@ -17,8 +17,8 @@ The fastest way to get started is using Docker Compose:
 # 1. Create necessary directories
 mkdir -p config data/db
 
-# 2. Edit the configuration templates
-# (you need to customize these files)
+# 2. Edit the configuration files
+# (you need to customize these files, or use the Web UI Editor at /v1/ui/rules-editor)
 nano providers.json
 nano models_fallback_rules.json
 
@@ -30,6 +30,8 @@ nano docker-compose.yml
 docker-compose up -d
 ```
 
+> **Note:** If `providers.json` or `models_fallback_rules.json` do not exist on the host, the entrypoint script will automatically generate default versions so the container can start. You can then configure them via the Web UI.
+
 ## Manual Docker Deployment
 
 If you prefer to use Docker CLI directly:
@@ -38,8 +40,8 @@ If you prefer to use Docker CLI directly:
 # 1. Create necessary directories
 mkdir -p config data/db
 
-# 2. Edit the configuration templates
-# (you need to customize these files)
+# 2. Edit the configuration files
+# (you need to customize these files, or use the Web UI Editor at /v1/ui/rules-editor)
 nano providers.json
 nano models_fallback_rules.json
 
@@ -49,9 +51,9 @@ docker build -t llm-gateway:latest .
 # 4. Run the container
 docker run -d \
   --name llm-gateway \
-  -p 9000:9000 \
-  -v "$(pwd)/providers.json:/app/providers.json:ro" \
-  -v "$(pwd)/models_fallback_rules.json:/app/models_fallback_rules.json:ro" \
+  -p 9100:9100 \
+  -v "$(pwd)/providers.json:/app/providers.json" \
+  -v "$(pwd)/models_fallback_rules.json:/app/models_fallback_rules.json" \
   -v "$(pwd)/data/db:/app/db" \
   -e GATEWAY_API_KEY=your-secure-api-key \
   -e APIKEY_OPENROUTER=your-openrouter-key \
@@ -70,7 +72,7 @@ docker run -d \
 
 ### Optional Environment Variables
 
-- `GATEWAY_PORT`: Port to run the gateway (default: 9000)
+- `GATEWAY_PORT`: Port to run the gateway (default: 9100)
 - `LOG_FILE_LIMIT`: Maximum log files to keep (default: 15)
 - `LOG_CHAT_ENABLED`: Enable chat logging (default: false)
 - `FALLBACK_PROVIDER`: Default fallback provider (default: openrouter)
@@ -92,15 +94,15 @@ Set any of these environment variables for the providers you want to use:
 
 ### Required Mounts
 
-1. **providers.json**: `-v ./providers.json:/app/providers.json:ro`
+1. **providers.json**: `-v ./providers.json:/app/providers.json`
 
    - Contains provider configurations
-   - Mounted read-only for security
+   - Read-write enabled so the Web UI Editor can save changes
 
-2. **models_fallback_rules.json**: `-v ./models_fallback_rules.json:/app/models_fallback_rules.json:ro`
+2. **models_fallback_rules.json**: `-v ./models_fallback_rules.json:/app/models_fallback_rules.json`
 
    - Contains fallback rules and model rotation settings
-   - Mounted read-only for security
+   - Read-write enabled so the Web UI Editor can save changes
 
 3. **Database**: `-v ./data/db:/app/db`
    - Persists SQLite database for model rotation state
@@ -142,8 +144,8 @@ docker-compose down
 
 Once the container is running, you can access:
 
-- Web UI: `http://localhost:9000/v1/ui/rules-editor`
-- API: `http://localhost:9000/v1/chat/completions`
+- Web UI: `http://localhost:9100/v1/ui/rules-editor`
+- API: `http://localhost:9100/v1/chat/completions`
 
 Remember to use the `GATEWAY_API_KEY` in your requests as:
 

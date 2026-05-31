@@ -17,7 +17,7 @@ def check_health():
     Check if the LLM Gateway is healthy by making a request to the /health endpoint.
     """
     host = "localhost"
-    port = int(os.environ.get("GATEWAY_PORT", 9000))
+    port = int(os.environ.get("GATEWAY_PORT", 9100))
 
     # Give the service a moment to respond (useful for startup)
     retries = 3

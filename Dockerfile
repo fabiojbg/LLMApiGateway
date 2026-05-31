@@ -61,21 +61,24 @@ RUN rm -f /app/.env /app/providers.json /app/models_fallback_rules.json
 COPY docker/healthcheck.py /app/
 COPY docker/entrypoint.sh /app/
 
+# Fix Windows CRLF line endings to Unix LF (prevents "no such file or directory" errors)
+RUN sed -i 's/\r$//' /app/entrypoint.sh
+
 # Set proper permissions
 RUN chown -R llmgateway:llmgateway /app && \
     chmod -R 755 /app && \
     chmod +x /app/entrypoint.sh
 
 # Set default environment variables
-ENV GATEWAY_PORT=9000 \
+ENV GATEWAY_PORT=9100 \
     GATEWAY_HOST="0.0.0.0" \
     LOG_FILE_LIMIT=15 \
-    LOG_CHAT_ENABLED=false \
+    LOG_CHAT_ENABLED=true \
     FALLBACK_PROVIDER=openrouter \
     PYTHONUNBUFFERED=1
 
 # Expose the application port
-EXPOSE 9000
+EXPOSE 9100
 
 # Switch to non-root user
 USER llmgateway

@@ -9,7 +9,7 @@ __pycache__/
 *.so
 .Python
 env/
-.env
+#.env
 venv/
 ENV/
 .venv
@@ -21,7 +21,7 @@ db/
 logs/
 
 # Configuration files - will be mounted or provided via env vars
-.env
+#.env
 providers.json
 models_fallback_rules.json
 

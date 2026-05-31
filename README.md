@@ -44,12 +44,12 @@ See: [Changelog](CHANGELOG.md)
 ## Configuration
 
 ### Edit providers and fallback rules
-Before starting to use LLMGateway, you need to fill in your providers and models with their fallback rules by accessing the configuration page with your web browser at http://localhost:9000/v1/ui/rules-editor. Refer to the following sections to learn how to structure these rules.
+Before starting to use LLMGateway, you need to fill in your providers and models with their fallback rules by accessing the configuration page with your web browser at http://localhost:9100/v1/ui/rules-editor. Refer to the following sections to learn how to structure these rules.
 
 ![Config example](./images/config-example.png)
 
 ## Usage Statistics
-From the page http://localhost:9000/v1/ui/usage-stats, you can see your usage statistics.
+From the page http://localhost:9100/v1/ui/usage-stats, you can see your usage statistics.
 
 **Note**: The usage statistics page works best with token usage from OpenRouter API calls. Other providers will most probably be shown with empty values because token usage is not provided by their APIs or does not conform to OpenRouter's structure.
 
@@ -136,7 +136,7 @@ The `apikey` fields are keys to the environment variables with the actual key va
 ### Fallback Rules JSON Example (`models_fallback_rules.json`):
 
 >[!Note]
-> You can edit the fallback rules using web browser in `http://localhost:9000/v1/ui/ rules-editor`
+> You can edit the fallback rules using web browser in `http://localhost:9100/v1/ui/ rules-editor`
 
 #### Simple fallback 
 In this mode (`rotate_models=false`), the gateway always starts with the first model in each request and falls back to the next ones in case of failures.<br>
@@ -229,7 +229,7 @@ Custom headers a also available if needed.
 
 When a request comes to `/v1/chat/completions`:
 
-1.  The gateway finds the rule matching the requested `model` in the models_fallback_rules.json file.
+1.  The gateway finds the rule matching the requested `model` in the `models_fallback_rules.json` file.
 2.  If the model is not found in the rules, the gateway routes the request to the fallback provider defined by the FALLBACK_PROVIDER environment variable. The name of the model will be the same as received.
 3.  If model rotation is enabled (`"rotate_models": true`), the gateway selects the next model in the sequence for each request.
 4.  If model rotation is disabled (`"rotate_models": false` or ommited), the gateway always starts with the first model in the sequence and only falls back to the next ones in case of failure.

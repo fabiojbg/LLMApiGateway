@@ -145,7 +145,10 @@ data/
 
 # Cython debug symbols
 cython_debug/
-models_fallback_rules.mine.json
+models_fallback_rules.json
+providers.json
 model_rotation.sqlite
 *:Zone.Identifier
 db/llmgateway_rotation.db
+.specify/
+.agents/skills/

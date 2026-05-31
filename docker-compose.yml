@@ -7,34 +7,38 @@ services:
     container_name: llm-gateway
     restart: unless-stopped
     ports:
-      - "9000:9000"
+      - "9100:9100"
+    env_file:
+      - .env
     volumes:
       # Mount providers.json - edit this file to configure your providers
-      - ./providers.json:/app/providers.json:ro
+      # (read-write to allow the Web UI Editor to save changes)
+      - ./providers.json:/app/providers.json
       # Mount models_fallback_rules.json for fallback rules configuration
-      - ./models_fallback_rules.json:/app/models_fallback_rules.json:ro
+      # (read-write to allow the Web UI Editor to save changes)
+      - ./models_fallback_rules.json:/app/models_fallback_rules.json
       # Mount database directory for persistence
       - ./data/db:/app/db
-    environment:
-      # Required
-      - GATEWAY_API_KEY=your-secure-api-key (you can make this up)
-
-      # Optional gateway settings
-      - GATEWAY_PORT=9000
-      - GATEWAY_HOST=0.0.0.0
-      - LOG_FILE_LIMIT=15
-      - LOG_CHAT_ENABLED=false
-      - FALLBACK_PROVIDER=openrouter
-
-      # Provider API keys - uncomment and set the ones you need
-      - APIKEY_OPENROUTER=your-openrouter-api-key (given to you by OpenRouter)
-      # - APIKEY_OPENAI=your-openai-api-key
-      # - APIKEY_GOOGLE=your-google-api-key
-      # - APIKEY_NEBIUS=your-nebius-api-key
-      # - APIKEY_TOGETHER=your-together-api-key
-      # - APIKEY_KLUSTERAI=your-klusterai-api-key
-      # - APIKEY_REQUESTY=your-requesty-api-key
-      # - APIKEY_XAI=your-xai-api-key
+    # environment:
+    #   # Required
+    #   - GATEWAY_API_KEY=your-secure-api-key (you can make this up)
+    # 
+    #   # Optional gateway settings
+    #   - GATEWAY_PORT=9100
+    #   - GATEWAY_HOST=0.0.0.0
+    #   - LOG_FILE_LIMIT=15
+    #   - LOG_CHAT_ENABLED=false
+    #   - FALLBACK_PROVIDER=openrouter
+    # 
+    #   # Provider API keys - uncomment and set the ones you need
+    #   - APIKEY_OPENROUTER=your-openrouter-api-key (given to you by OpenRouter)
+    #   # - APIKEY_OPENAI=your-openai-api-key
+    #   # - APIKEY_GOOGLE=your-google-api-key
+    #   # - APIKEY_NEBIUS=your-nebius-api-key
+    #   # - APIKEY_TOGETHER=your-together-api-key
+    #   # - APIKEY_KLUSTERAI=your-klusterai-api-key
+    #   # - APIKEY_REQUESTY=your-requesty-api-key
+    #   # - APIKEY_XAI=your-xai-api-key
     healthcheck:
       test: ["CMD", "python", "/app/healthcheck.py"]
       interval: 30s

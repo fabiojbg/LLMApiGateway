@@ -27,11 +27,11 @@ Use it with code agents like Cline, RooCode, or even with your applications as a
 ## Configuration
 
 ### Edit providers and fallback rules
-Before starting to use LLMGateway, you need to fill in your providers and models with their fallback rules by accessing the configuration page with your web browser at http://localhost:9000/v1/ui/rules-editor. Refer to the following sections to learn how to structure these rules.
+Before starting to use LLMGateway, you need to fill in your providers and models with their fallback rules by accessing the configuration page with your web browser at http://localhost:9100/v1/ui/rules-editor. Refer to the following sections to learn how to structure these rules.
 
 
 ## Usage Statistics
-From the page http://localhost:9000/v1/ui/usage-stats, you can see your usage statistics.
+From the page http://localhost:9100/v1/ui/usage-stats, you can see your usage statistics.
 
 **Note**: The usage statistics page works best with token usage from OpenRouter API calls. Other providers will most probably be shown with empty values because token usage is not provided by their APIs or does not conform to OpenRouter's structure.
 
@@ -113,7 +113,7 @@ The `apikey` fields are keys to the environment variables with the actual key va
 ### Fallback Rules JSON Example (`models_fallback_rules.json`):
 
 >[!Note]
-> You can edit the fallback rules using web browser in `http://localhost:9000/v1/ui/ rules-editor`
+> You can edit the fallback rules using web browser in `http://localhost:9100/v1/ui/ rules-editor`
 
 #### Simple fallback 
 In this mode (`rotate_models=false`), the gateway always starts with the first model in each request and falls back to the next ones in case of failures.<br>

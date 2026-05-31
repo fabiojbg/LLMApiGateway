@@ -6,27 +6,31 @@ echo "LLM Gateway starting..."
 echo "Container logs will be available in the container only and not persisted to host."
 echo "Container database will be persisted to host via volume mount."
 
-# Check if providers.json exists
-if [ ! -f "/app/providers.json" ]; then
-    echo "ERROR: providers.json not found. Please mount this file as a volume."
-    echo "Example: -v ./providers.json:/app/providers.json:ro"
-    exit 1
-fi
-
 # Create logs directory if it doesn't exist
 mkdir -p /app/logs
 
 # Create directory for database if it doesn't exist
 mkdir -p /app/db
 
-# If models_fallback_rules.json doesn't exist, use the template or create a default one
+# If providers.json doesn't exist, create a default one so the container starts
+# but the user will need to configure their actual providers via the Web UI or manually
+if [ ! -f "/app/providers.json" ]; then
+    echo "WARNING: providers.json not found, creating with default content."
+    echo "Please configure your providers via the Web UI at /v1/ui/rules-editor or mount a custom providers.json."
+    echo '[
+    {
+        "'${FALLBACK_PROVIDER:-openrouter}'": {
+            "baseUrl": "https://openrouter.ai/api/v1",
+            "apikey": "APIKEY_OPENROUTER"
+        }
+    }
+]' > /app/providers.json
+fi
+
+# If models_fallback_rules.json doesn't exist, create a default one
 if [ ! -f "/app/models_fallback_rules.json" ]; then
-    if [ -f "/app/docker/models_fallback_rules.json.template" ]; then
-        echo "models_fallback_rules.json not found, copying from template."
-        cp /app/docker/models_fallback_rules.json.template /app/models_fallback_rules.json
-    else
-        echo "models_fallback_rules.json not found and template not available, creating with default content."
-        echo '[
+    echo "models_fallback_rules.json not found, creating with default content."
+    echo '[
     {
         "gateway_model_name": "llmgateway/default",
         "rotate_models": false,
@@ -40,11 +44,10 @@ if [ ! -f "/app/models_fallback_rules.json" ]; then
         ]
     }
 ]' > /app/models_fallback_rules.json
-    fi
 fi
 
 # Print some useful information
-echo "Gateway configured to listen on ${GATEWAY_HOST:-0.0.0.0}:${GATEWAY_PORT:-9000}"
+echo "Gateway configured to listen on ${GATEWAY_HOST:-0.0.0.0}:${GATEWAY_PORT:-9100}"
 echo "Default fallback provider: ${FALLBACK_PROVIDER:-openrouter}"
 echo "Log chat enabled: ${LOG_CHAT_ENABLED:-false}"
 
