@@ -63,6 +63,8 @@ Before running the gateway, you need to create the configuration files from the 
 ### Edit providers and fallback rules
 Before starting to use LLMGateway, you need to fill in your providers and models with their fallback rules by accessing the configuration page with your web browser at http://localhost:9100/v1/ui/rules-editor. Refer to the following sections to learn how to structure these rules.
 
+> **note**: The dafult port of the LLMGateway was changed from 9000 to 9100 to avoid conflicts with other tools like MinIO.
+
 ![Config example](./images/config-example.png)
 
 ## Usage Statistics

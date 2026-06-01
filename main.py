@@ -74,6 +74,7 @@ app.add_middleware(
 )
 
 # 2. Request Logging Middleware (using class-based example)
+logger.info("Adding RequestLoggingMiddleware to app")
 app.add_middleware(RequestLoggingMiddleware)
 
 # 3. Authentication Middleware (using functional example)
