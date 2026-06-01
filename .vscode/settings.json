@@ -1,10 +1,17 @@
 {
-    "files.associations": {
-      "**/models_fallback_rules.json": "jsonc",
-      "**/providers.json": "jsonc",
-      "**/models_fallback_rules.*.json": "jsonc",
-    },
-    "python.analysis.extraPaths": [
-      "./middleware"
-    ]
+  "files.associations": {
+    "**/models_fallback_rules.json": "jsonc",
+    "**/providers.json": "jsonc",
+    "**/models_fallback_rules.*.json": "jsonc",
+  },
+  "python.analysis.extraPaths": [
+    "./middleware"
+  ],
+  "chat.instructionsFilesLocations": {
+    ".github/instructions": false,
+    ".claude/rules": false,
+    "~/.copilot/instructions": false,
+    "~/.claude/rules": false,
+    ".agents/rules": true
+  }
 }

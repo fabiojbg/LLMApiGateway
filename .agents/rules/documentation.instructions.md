@@ -1,3 +1,9 @@
+---
+trigger: always_on
+description: Project documentation, how to use.
+applyTo: '**'
+---
+
 # Fault-Tolerant Personal LLM Gateway
 ---
 <br>

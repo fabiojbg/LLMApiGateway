@@ -143,6 +143,15 @@ dmypy.json
 # Suggested docker volume
 data/
 
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/code-actions-on-save.json
+
+
 # Cython debug symbols
 cython_debug/
 models_fallback_rules.json
@@ -150,5 +159,25 @@ providers.json
 model_rotation.sqlite
 *:Zone.Identifier
 db/llmgateway_rotation.db
+
 .specify/
 .agents/skills/
+app-deploy/
+.gitnexus/
+.agents/skills/openspec*
+.agent/skills/openspec*
+.agents/workflows/opsx*
+.agent/workflows/opsx*
+.agents/skills/gitnexus*
+.claude/skills/gitnexus*
+
+.agents/skills/
+.agent/skills/
+.agent/workflows/
+.agents/workflows/
+.agents/agents.md
+.specify
+production_artifacts/
+fix_artifacts/
+.app_data/*
+CLAUDE.md

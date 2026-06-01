@@ -1,3 +1,9 @@
+---
+trigger: always_on
+description: Project explanation and work instructions
+applyTo: '**'
+---
+
 # Project briefing
 This project is a personal LLM Gateway that allows developers to use LLMs from different LLM providers with features like fault tolerance, model load balancing, customized model requests, call retries, and more.
 The LLM Gateway works locally as an OpenAI-compatible LLM API provider with advanced fallback support for models in case of response failures.
