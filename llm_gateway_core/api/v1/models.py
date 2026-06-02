@@ -96,7 +96,15 @@ async def get_models():
 
 
     # 3. Format final response
-    response_list = sorted(list(gateway_models.values()), key=lambda x: x['id']) # Sort by ID
+    # Separate gateway rule models (from fallback_rules) and fallback provider models
+    gateway_rule_models = [info for model_id, info in gateway_models.items() if model_id in fallback_rules]
+    
+    fallback_provider_models = sorted(
+        [info for model_id, info in gateway_models.items() if model_id not in fallback_rules],
+        key=lambda x: x['id']
+    )
+    # Gateway rule models first, then fallback provider models
+    response_list = gateway_rule_models + fallback_provider_models
     return {
         "object": "list",
         "data": response_list
