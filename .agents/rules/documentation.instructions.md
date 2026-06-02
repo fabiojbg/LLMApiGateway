@@ -23,6 +23,7 @@ Use it with code agents like Cline, RooCode, or even with your applications as a
 
 
 ## Gateway endpoints
+  - `/` - Redirects to `/v1/ui/rules-editor` (the web-based rules editor).
   - `/v1/models` - Like v1, just lists available models.
   - `/v1/chat/completions` - OpenAI compatible API that routes calls to other providers with fallback in case of call failure.
 
@@ -33,7 +34,7 @@ Use it with code agents like Cline, RooCode, or even with your applications as a
 ## Configuration
 
 ### Edit providers and fallback rules
-Before starting to use LLMGateway, you need to fill in your providers and models with their fallback rules by accessing the configuration page with your web browser at http://localhost:9100/v1/ui/rules-editor. Refer to the following sections to learn how to structure these rules.
+Before starting to use LLMGateway, you need to fill in your providers and models with their fallback rules by accessing the configuration page with your web browser at http://localhost:9100 and you will be redirected to the rules editor. Refer to the following sections to learn how to structure these rules.
 
 
 ## Usage Statistics

@@ -51,7 +51,8 @@ Before running the gateway, you need to create the configuration files from the 
 
 ## Gateway endpoints
 
-  - `/v1/models` - Like v1, just lists available models.
+  - `/` - Redirects to `/v1/ui/rules-editor` (the web-based rules editor).
+  - `/v1/models` - lists available models.
   - `/v1/chat/completions` - OpenAI compatible API that routes calls to other providers with fallback in case of call failure.
 
   
@@ -61,7 +62,7 @@ Before running the gateway, you need to create the configuration files from the 
 ## Configuration
 
 ### Edit providers and fallback rules
-Before starting to use LLMGateway, you need to fill in your providers and models with their fallback rules by accessing the configuration page with your web browser at http://localhost:9100/v1/ui/rules-editor. Refer to the following sections to learn how to structure these rules.
+Before starting to use LLMGateway, you need to fill in your providers and models with their fallback rules by accessing the configuration page with your web browser at http://localhost:9100 and you will be redirected to the rules editor. Refer to the following sections to learn how to structure these rules.
 
 > **note**: The dafult port of the LLMGateway was changed from 9000 to 9100 to avoid conflicts with other tools like MinIO.
 

@@ -1,6 +1,7 @@
 import logging
 import uvicorn
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -101,6 +102,12 @@ app.include_router(api_v1_stats_router, prefix="/v1", tags=["Usage Stats"])
 # --- Static Files ---
 app.mount("/static", StaticFiles(directory=str(STATIC_FILES_DIR)), name="static")
 logger.info(f"Static files mounted from {STATIC_FILES_DIR}")
+
+# --- Root Endpoint (redirect to rules editor) ---
+@app.get("/", tags=["Root"], include_in_schema=False)
+async def root_redirect():
+    """Redirects the root URL to the rules editor UI."""
+    return RedirectResponse(url="/v1/ui/rules-editor", status_code=307)
 
 # --- Basic Health Check Endpoint ---
 @app.get("/health", tags=["Health"])
