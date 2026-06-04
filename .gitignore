@@ -181,3 +181,4 @@ production_artifacts/
 fix_artifacts/
 .app_data/*
 CLAUDE.md
+.github/agents/

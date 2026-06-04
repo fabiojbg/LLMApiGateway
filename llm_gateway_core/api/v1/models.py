@@ -20,6 +20,62 @@ http_client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0)) # Sho
 
 router = APIRouter()
 
+@router.get("/asOpenCode")
+async def get_models_as_opencode(includefallback: bool = False):
+    """
+    Returns a JSON compatible with opencode.json for configuring this gateway as a provider.
+    """
+    # Call the existing get_models to get the list
+    models_data = await get_models()
+    
+    opencode_models = {}
+    for model_info in models_data.get("data", []):
+        model_id = model_info.get("id")
+        if not model_id:
+            continue
+            
+        # If includefallback is False, we only keep models defined in our fallback_rules (local models)
+        if not includefallback and model_id not in fallback_rules:
+            continue
+            
+        # Try to extract context and output limits
+        context_length = 400000
+        max_completion_tokens = 32000
+        
+        top_provider = model_info.get("top_provider", {})
+        if "context_length" in top_provider and top_provider["context_length"] is not None:
+            context_length = top_provider["context_length"]
+        if "max_completion_tokens" in top_provider and top_provider["max_completion_tokens"] is not None:
+            max_completion_tokens = top_provider["max_completion_tokens"]
+            
+        opencode_models[model_id] = {
+            "name": model_info.get("name", model_id),
+            "limit": {
+                "context": context_length,
+                "output": max_completion_tokens
+            }
+        }
+        
+    api_key = settings.gateway_api_key or "12345678"
+    
+    return {
+        "$schema": "https://opencode.ai/config.json",
+        "provider": {
+            "llm-gateway-local": {
+                "npm": "@ai-sdk/openai-compatible",
+                "name": "LLM Gateway (local)",
+                "options": {
+                    "baseURL": f"http://localhost:{settings.gateway_port}/v1",
+                    "apiKey": api_key,
+                    "headers": {
+                        "Authorization": f"Bearer {api_key}"
+                    }
+                },
+                "models": opencode_models
+            }
+        }
+    }
+
 @router.get("") # Route relative to the prefix defined in v1/__init__.py
 async def get_models():
     """
