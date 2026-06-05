@@ -39,7 +39,7 @@ async def get_models_as_opencode(includefallback: bool = False):
             continue
             
         # Try to extract context and output limits
-        context_length = 400000
+        context_length = 200000
         max_completion_tokens = 32000
         
         top_provider = model_info.get("top_provider", {})
@@ -74,6 +74,84 @@ async def get_models_as_opencode(includefallback: bool = False):
                 "models": opencode_models
             }
         }
+    }
+
+@router.get("/AsGitHubCopilot")
+async def get_models_as_github_copilot(includefallback: bool = False):
+    """
+    Returns a JSON compatible with chatLanguageModels.json for configuring Github Copilot.
+    """
+    # Call the existing get_models to get the list
+    models_data = await get_models()
+    
+    copilot_models = []
+    for model_info in models_data.get("data", []):
+        model_id = model_info.get("id")
+        if not model_id:
+            continue
+            
+        # If includefallback is False, we only keep models defined in our fallback_rules (local models)
+        if not includefallback and model_id not in fallback_rules:
+            continue
+            
+        # 1. toolCalling: always True
+        tool_calling = True
+        
+        # 2. vision: True if 'image' is in input_modalities of architecture
+        vision = False
+        architecture = model_info.get("architecture", {})
+        if architecture and isinstance(architecture, dict):
+            input_modalities = architecture.get("input_modalities", [])
+            if isinstance(input_modalities, list) and "image" in input_modalities:
+                vision = True
+                
+        # 3. supportsReasoningEffort: check if 'reasoning' is in supported_parameters
+        supports_reasoning = False
+        supported_parameters = model_info.get("supported_parameters", [])
+        if isinstance(supported_parameters, list) and "reasoning" in supported_parameters:
+            supports_reasoning = True
+            
+        # For local models, force the specifications requested by the user
+        if model_id in fallback_rules:
+            vision = True
+            supports_reasoning = True
+            
+        # Extract max input and output tokens
+        max_input_tokens = 400000
+        max_output_tokens = 60000
+        
+        top_provider = model_info.get("top_provider", {})
+        if "context_length" in top_provider and top_provider["context_length"] is not None:
+            max_input_tokens = top_provider["context_length"]
+        elif "context_length" in model_info and model_info["context_length"] is not None:
+            max_input_tokens = model_info["context_length"]
+            
+        if "max_completion_tokens" in top_provider and top_provider["max_completion_tokens"] is not None:
+            max_output_tokens = top_provider["max_completion_tokens"]
+            
+        model_entry = {
+            "id": model_id,
+            "name": model_info.get("name", model_id),
+            "url": f"http://localhost:{settings.gateway_port}/v1/chat/completions",
+            "toolCalling": tool_calling,
+            "vision": vision,
+            "maxInputTokens": max_input_tokens,
+            "maxOutputTokens": max_output_tokens
+        }
+        
+        if supports_reasoning:
+            model_entry["supportsReasoningEffort"] = ["none", "minimal", "low", "medium", "high", "xhigh"]
+            
+        copilot_models.append(model_entry)
+        
+    api_key = settings.gateway_api_key or "12345678"
+    
+    return {
+        "name": "LLMGateway",
+        "vendor": "customendpoint",
+        "apiKey": api_key,
+        "apiType": "chat-completions",
+        "models": copilot_models
     }
 
 @router.get("") # Route relative to the prefix defined in v1/__init__.py
