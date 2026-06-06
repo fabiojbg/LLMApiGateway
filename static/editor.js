@@ -7,10 +7,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const tabRules = document.getElementById('tabRules');
     const tabProviders = document.getElementById('tabProviders');
+    const tabAgents = document.getElementById('tabAgents');
     const editorContainerRules = document.getElementById('editor-container-rules');
     const editorContainerProviders = document.getElementById('editor-container-providers');
+    const editorContainerAgents = document.getElementById('editor-container-agents');
     const jsonEditorRulesTextArea = document.getElementById('jsonEditorRules');
     const jsonEditorProvidersTextArea = document.getElementById('jsonEditorProviders');
+    const controlsContainer = document.querySelector('.controls');
 
     let editorRules, editorProviders;
     let activeEditor = 'rules'; // 'rules' or 'providers'
@@ -106,35 +109,61 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Tab Switching Logic ---
     function switchTab(tabName) {
         activeEditor = tabName;
+        
+        // Reset all tabs
+        tabRules.classList.remove('active');
+        tabProviders.classList.remove('active');
+        if (tabAgents) tabAgents.classList.remove('active');
+        editorContainerRules.classList.remove('active');
+        editorContainerRules.style.display = 'none';
+        editorContainerProviders.classList.remove('active');
+        editorContainerProviders.style.display = 'none';
+        if (editorContainerAgents) {
+            editorContainerAgents.classList.remove('active');
+            editorContainerAgents.style.display = 'none';
+        }
+
+        // Handle controls and save button visibility
+        if (tabName === 'agents') {
+            if (controlsContainer) controlsContainer.style.display = 'none';
+            if (saveButton) saveButton.style.display = 'none';
+        } else {
+            if (controlsContainer) controlsContainer.style.display = 'flex';
+            if (saveButton) saveButton.style.display = 'block';
+        }
+
         if (tabName === 'rules') {
             tabRules.classList.add('active');
-            tabProviders.classList.remove('active');
             editorContainerRules.classList.add('active');
             editorContainerRules.style.display = 'block';
-            editorContainerProviders.classList.remove('active');
-            editorContainerProviders.style.display = 'none';
             if (!editorRules) {
                 editorRules = initCodeMirror(jsonEditorRulesTextArea, themeSelector.value);
             }
             loadEditorData(editorRules, '/v1/config/models-rules', 'Fallback Rules');
             if (editorRules) editorRules.refresh();
         } else if (tabName === 'providers') {
-            tabRules.classList.remove('active');
             tabProviders.classList.add('active');
-            editorContainerRules.classList.remove('active');
-            editorContainerRules.style.display = 'none';
             editorContainerProviders.classList.add('active');
             editorContainerProviders.style.display = 'block';
             if (!editorProviders) {
                 editorProviders = initCodeMirror(jsonEditorProvidersTextArea, themeSelector.value);
             }
-            loadEditorData(editorProviders, '/v1/config/providers', 'Providers'); // New endpoint
+            loadEditorData(editorProviders, '/v1/config/providers', 'Providers');
             if (editorProviders) editorProviders.refresh();
+        } else if (tabName === 'agents') {
+            if (tabAgents) tabAgents.classList.add('active');
+            if (editorContainerAgents) {
+                editorContainerAgents.classList.add('active');
+                editorContainerAgents.style.display = 'block';
+            }
+            messageArea.textContent = '';
+            messageArea.className = '';
         }
     }
 
     tabRules.addEventListener('click', () => switchTab('rules'));
     tabProviders.addEventListener('click', () => switchTab('providers'));
+    if (tabAgents) tabAgents.addEventListener('click', () => switchTab('agents'));
 
     // --- Data Loading ---
     function loadEditorData(editorInstance, endpoint, configName) {
@@ -250,6 +279,59 @@ document.addEventListener('DOMContentLoaded', function () {
             saveButton.textContent = 'Save Configuration';
         });
     });
+
+    // --- Download JSON Logic ---
+    const downloadOpenCodeBtn = document.getElementById('downloadOpenCodeBtn');
+    const downloadCopilotBtn = document.getElementById('downloadCopilotBtn');
+    const includeFallbackCheckbox = document.getElementById('includeFallbackCheckbox');
+
+    function triggerDownload(jsonData, filename) {
+        const jsonString = JSON.stringify(jsonData, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    async function handleDownload(endpoint, filename) {
+        const includefallback = includeFallbackCheckbox ? includeFallbackCheckbox.checked : false;
+        const url = `${endpoint}?includefallback=${includefallback}`;
+        
+        messageArea.textContent = `Generating ${filename}...`;
+        messageArea.className = 'info';
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            triggerDownload(data, filename);
+            messageArea.textContent = `${filename} downloaded successfully.`;
+            messageArea.className = 'success';
+        } catch (error) {
+            console.error(`Error downloading ${filename}:`, error);
+            messageArea.textContent = `Error downloading ${filename}: ${error.message}`;
+            messageArea.className = 'error';
+        }
+    }
+
+    if (downloadOpenCodeBtn) {
+        downloadOpenCodeBtn.addEventListener('click', () => {
+            handleDownload('/v1/models/AsOpenCodeFormat', 'opencode.json');
+        });
+    }
+
+    if (downloadCopilotBtn) {
+        downloadCopilotBtn.addEventListener('click', () => {
+            handleDownload('/v1/models/AsGitHubCopilotFormat', 'chatLanguageModels.json');
+        });
+    }
 
     // --- Initialize ---
     // Load default tab (rules)

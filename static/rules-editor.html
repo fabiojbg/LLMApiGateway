@@ -29,6 +29,7 @@
         <div class="tabs">
             <button id="tabRules" class="tab-button active" data-tab="rules">Fallback Rules</button>
             <button id="tabProviders" class="tab-button" data-tab="providers">Providers</button>
+            <button id="tabAgents" class="tab-button" data-tab="agents">Agents Integration</button>
         </div>
 
         <div style="position:relative">
@@ -43,6 +44,29 @@
             </div>
             <div id="editor-container-providers" class="editor-tab-content" style="display: none;">
                 <textarea id="jsonEditorProviders"></textarea>
+            </div>
+            <div id="editor-container-agents" class="editor-tab-content" style="display: none; padding: 20px;">
+                <div class="export-section" style="border:none; margin-top:0; padding:0; background:transparent;">
+                    <h2>Export configurations for coding agents</h2>
+                    <p style="margin-bottom: 20px; color: var(--text-color); opacity: 0.8;">Download the models configuration in the format required by OpenCode or GitHub Copilot.</p>
+                    <div class="export-controls">
+                        <div class="checkbox-container">
+                            <label class="switch">
+                                <input type="checkbox" id="includeFallbackCheckbox">
+                                <span class="slider round"></span>
+                            </label>
+                            <span class="checkbox-label">Include fallback provider models (e.g., OpenRouter models)</span>
+                        </div>
+                        <div class="export-buttons">
+                            <button id="downloadOpenCodeBtn" class="export-button">
+                                Download OpenCode JSON
+                            </button>
+                            <button id="downloadCopilotBtn" class="export-button">
+                                Download GitHub Copilot JSON
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         <button id="saveButton">Save Configuration</button>
