@@ -4,6 +4,17 @@
     "**/providers.json": "jsonc",
     "**/models_fallback_rules.*.json": "jsonc",
   },
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.venv": true    
+  },
+  "search.exclude": {
+    "**/logs": true,
+    "**/db": true,
+    "**/.gitnexus": true,
+  },
   "python.analysis.extraPaths": [
     "./middleware"
   ],

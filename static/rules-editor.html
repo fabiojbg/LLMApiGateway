@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM Gateway v1.10 - Configuration Editor</title>
+    <title>LLM Gateway v1.11 - Configuration Editor</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
     <!-- CodeMirror Themes -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/material-darker.min.css">
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/material-darker.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/monokai.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/nord.min.css">
@@ -14,6 +16,7 @@
     <!-- Add more theme CSS links here if needed -->
     <link rel="stylesheet" href="/static/editor.css">
 </head>
+
 <body>
     <div style="position: absolute; width: 100%;">
         <nav class="navbar">
@@ -22,9 +25,9 @@
                 <span class="icon-placeholder"></span>
             </button>
         </nav>
-    </div>    
+    </div>
     <div class="container">
-        <h1>LLM Gateway - Configuration Editor <span style="font-size:small">(v1.10)</span></h1>
+        <h1>LLM Gateway - Configuration Editor <span style="font-size:small">(v1.11)</span></h1>
 
         <div class="tabs">
             <button id="tabRules" class="tab-button active" data-tab="rules">Fallback Rules</button>
@@ -48,23 +51,56 @@
             <div id="editor-container-agents" class="editor-tab-content" style="display: none; padding: 20px;">
                 <div class="export-section" style="border:none; margin-top:0; padding:0; background:transparent;">
                     <h2>Export configurations for coding agents</h2>
-                    <p style="margin-bottom: 20px; color: var(--text-color); opacity: 0.8;">Download the models configuration in the format required by OpenCode or GitHub Copilot.</p>
-                    <div class="export-controls">
+                    <p style="margin-bottom: 20px; color: var(--text-color); opacity: 0.8; text-align: left;">Download
+                        the models configuration in the format required by OpenCode or GitHub Copilot.</p>
+                    <div class="export-controls" style="margin-bottom: 20px;">
                         <div class="checkbox-container">
                             <label class="switch">
                                 <input type="checkbox" id="includeFallbackCheckbox">
                                 <span class="slider round"></span>
                             </label>
-                            <span class="checkbox-label">Include fallback provider models (e.g., OpenRouter models)</span>
+                            <span class="checkbox-label">Include fallback provider models (e.g., OpenRouter
+                                models)</span>
                         </div>
-                        <div class="export-buttons">
-                            <button id="downloadOpenCodeBtn" class="export-button">
-                                Download OpenCode JSON
-                            </button>
-                            <button id="downloadCopilotBtn" class="export-button">
-                                Download GitHub Copilot JSON
-                            </button>
-                        </div>
+                    </div>
+
+                    <div class="tabs sub-tabs">
+                        <button id="tabOpenCode" class="tab-button sub-tab-button active"
+                            data-subtab="opencode">OpenCode</button>
+                        <button id="tabCopilot" class="tab-button sub-tab-button" data-subtab="copilot">GitHub
+                            Copilot</button>
+                    </div>
+
+                    <div id="subtab-opencode" class="subtab-content" style="display: block; padding-top: 15px;">
+                        <p style="text-align: left; margin-bottom: 15px;">OpenCode integration allows you to use the LLM
+                            Gateway models directly in your OpenCode environment.</p>
+                        <ol style="margin-bottom: 20px; line-height: 1.6;">
+                            <li>Download the configuration JSON file below.</li>
+                            <li>Copy the content and merge it into your <code>~/.config/opencode/opencode.jsonc</code>
+                                configuration file.</li>
+                            <li>For more detailed instructions, please refer to the official documentation: <a
+                                    href="https://opencode.ai/docs/models/" target="_blank">OpenCode Models
+                                    Documentation</a>.</li>
+                        </ol>
+                        <button id="downloadOpenCodeBtn" class="export-button" style="max-width: 300px;">
+                            Download OpenCode JSON
+                        </button>
+                    </div>
+
+                    <div id="subtab-copilot" class="subtab-content" style="display: none; padding-top: 15px;">
+                        <p style="text-align: left; margin-bottom: 15px;">GitHub Copilot integration enables you to use
+                            LLM Gateway models as custom language models in VS Code.</p>
+                        <ol style="margin-bottom: 20px; line-height: 1.6;">
+                            <li>Download the configuration JSON file below.</li>
+                            <li>Copy the content and merge it into your <code>chatLanguageModels.json</code>
+                                configuration file.</li>
+                            <li>For more detailed instructions, please refer to the official documentation: <a
+                                    href="https://code.visualstudio.com/docs/agent-customization/language-models"
+                                    target="_blank">VS Code Agent Customization</a>.</li>
+                        </ol>
+                        <button id="downloadCopilotBtn" class="export-button" style="max-width: 300px;">
+                            Download GitHub Copilot JSON
+                        </button>
                     </div>
                 </div>
             </div>
@@ -77,7 +113,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/lint/lint.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/lint/json-lint.min.js"></script>
-    <script src="https://unpkg.com/jsonlint@1.6.3/web/jsonlint.js"></script> 
+    <script src="https://unpkg.com/jsonlint@1.6.3/web/jsonlint.js"></script>
     <script src="/static/editor.js"></script>
 </body>
+
 </html>

@@ -333,6 +333,28 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // --- Sub-Tab Switching Logic ---
+    const tabOpenCode = document.getElementById('tabOpenCode');
+    const tabCopilot = document.getElementById('tabCopilot');
+    const subtabOpenCode = document.getElementById('subtab-opencode');
+    const subtabCopilot = document.getElementById('subtab-copilot');
+
+    if (tabOpenCode && tabCopilot) {
+        tabOpenCode.addEventListener('click', () => {
+            tabOpenCode.classList.add('active');
+            tabCopilot.classList.remove('active');
+            subtabOpenCode.style.display = 'block';
+            subtabCopilot.style.display = 'none';
+        });
+
+        tabCopilot.addEventListener('click', () => {
+            tabCopilot.classList.add('active');
+            tabOpenCode.classList.remove('active');
+            subtabCopilot.style.display = 'block';
+            subtabOpenCode.style.display = 'none';
+        });
+    }
+
     // --- Initialize ---
     // Load default tab (rules)
     switchTab('rules');

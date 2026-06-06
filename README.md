@@ -30,11 +30,11 @@ See: [Changelog](CHANGELOG.md)
 - **Flexible Configuration**: Configure fallback sequences and rotation settings per model.
 - **Custom LLM Parameters**: Configure custom request parameters for any LLM model.
 - **Usage Statistics**: Track the cost and consumption of tokens per hour, day, week, or month.
-
+- **NEW** - Coding Agents integrations for OpenCode and GitHub Copilot. See the ["Coding Agents Integration"](coding-agents-integration) for more information.
 
 ## Getting Started
 
-Before running the gateway, you need to create the configuration files from the provided examples and edit them accordingly:
+Before running the gateway, you need to create the configuration files from the provided examples and edit them accordingly.
 
 1.  **Environment Variables**:
     ```bash
@@ -49,72 +49,86 @@ Before running the gateway, you need to create the configuration files from the 
     cp models_fallback_rules.json.example models_fallback_rules.json
     ```
 
+See [Gateway Configuration](#gateway-configuration) for more information about how to configure these files.
+
+
 ## Gateway endpoints
 
-  - `/` - Redirects to `/v1/ui/rules-editor` (the web-based rules editor).
-  - `/v1/models` - lists available models.
-  - `/v1/chat/completions` - OpenAI compatible API that routes calls to other providers with fallback in case of call failure.
-    
-    >**HOT FEATURE (Chat Completions):**: The `/v1/chat/completions` endpoint allows you to create a sequence of fallback models to be called in case of failure, with support for retries and custom parameters injection (like the new `service_tier` of OpenRouter which allows reduce model's cost). 
-    
-    > For example, if a model response fails, the gateway can retry the same model after a period of time or automatically move to the next model in the fallback sequence, and so on. The model's sequence can consist of different models and different providers. For instance, the first model in the sequence could be deepseek-chat from OpenRouter, and the gateway can be configured to fall back to gpt-4o from OpenAI in case of failure. This fallback sequence can be of any size and must be configured in the file `models_fallback_rules.json` (either manually or using the new web editor).
+- `/v1/models` - lists the available gateway models as configured in the rules editor.
+- `/v1/chat/completions` - All the magic happens here. This is an OpenAI-compatible chat completions API that can be used with any OpenAI-compatible client (like Cline, OpenCode, etc.) or application. It routes calls to your configured gateway models with fallback support and custom parameter injection.
 
-## Coding Agent Integration Endpoints
-  - `models/AsGitHubCopilotFormat?includefallback=true|false` - Returns JSON appropriate for copying to the `opencode.jsonc` file so OpenCode can use the LLMApiGateway models (see https://opencode.ai/docs/models/)
-  - `models/AsOpenCodeFormat=true|false` - Returns JSON appropriate for copying to the GitHub Copilot `chatLanguageModels.json` file so Copilot can access LLMGateway models even in free mode.
+  > The **LLMApiGateway** chat completions API supports:
+  - `retries`: on timeout or rate-limit errors, apply after a timeout period (useful for freeing models that apply token limits)
+  - `OpenRouter providers ordering` - define the allowed providers for OpenRouter. Useful to choose and define the order of OpenRouter model's providers accepted.
+  - `model rotation` - call models in sequence in a rotational manner (if configured)
+  - `custom parameter injection` - inject parameters like `reasoning_effort`, `temperature`, `top_p`, and even the new `service_tier` for OpenRouter, Gemini, and OpenAI models, which allows you to greatly reduce model costs.
 
+## Coding Agents Integration 
 
-## Configuration
+### GitHub Copilot Integration
 
-### Edit providers and fallback rules
-Before starting to use LLMGateway, you need to fill in your providers and models with their fallback rules by accessing the configuration page with your web browser at http://localhost:9100 and you will be redirected to the rules editor. Refer to the following sections to learn how to structure these rules.
+Open the **Agents Integration** tab and select the **"GitHub Copilot"** sub-tab, then download the JSON file with the model configuration for GitHub Copilot. Copy the contents of the file and merge them into your **chatLanguageModels.json** configuration file.
 
-> **note**: The dafult port of the LLMGateway was changed from 9000 to 9100 to avoid conflicts with other tools like MinIO.
+![GitHub Copilot Integration](images/GitHubCopilot-Integration.png)
 
-![Config example](./images/config-example.png)
+Once integrated, the LLMApiGateway models can be seen in the copilot model list
 
-## Usage Statistics
-From the page http://localhost:9100/v1/ui/usage-stats, you can see your usage statistics.
-
-**Note**: The usage statistics page works best with token usage from OpenRouter API calls. Other providers will most probably be shown with empty values because token usage is not provided by their APIs or does not conform to OpenRouter's structure.
-
-![Config example](./images/statistics-example-01.png)
-
-![Config example](./images/statistics-example-02.png)
+![GitHub Copilot Integration](images/GitHubCopilot-Models.png)
 
 
-## .env file
+### OpenCode Integration
 
-Create a `.env` file from the example .env.example:
-```bash
-cp .env.example .env
-```
+Open the **Agents Integration** tab and select the **OpenCode** sub-tab. Then download the JSON file with the model configuration for OpenCode. Copy the file’s contents and merge them into your `opencode.json` configuration file.
 
- ### **.env** configuration example:
+![OpenCode integration](images/OpenCode-Integration.png)
+
+Once integrated, the LLMApiGateway models can be seen in the OpenCode model list.
+
+![OpenCode Integration](images/OpenCode-Models.png)
+
+### Cline (VS Code Extension)
+
+For Cline you just need to configure it as an OpenAI-compatible provider. Here is an example of using this gateway with Cline, set to use the model `'llmgateway/free-stack'`, which only uses models free of charge, as configured in the example above.
+
+![Cline example](./images/cline-example.png)
+
+
+
+## Gateway Configuration
+
+### The `.env` file
+
+The `.env` file must be configured as shown in the example below:
+
+### **.env** configuration example:
  ```
+# this gateway HTTP PORT
+GATEWAY_PORT=9100
+
 # This gateway must have its own API key that clients must use to access it
-# Use it in http header as "Authorization: Bearer <ThisGatewayApiKey>"
+# Use it in http header as "Authorization: Bearer <ThisGatewayApiKey>)""
 GATEWAY_API_KEY=<ThisGatewayApiKey>
 
 # Maximum number of log files to keep (older files will be deleted)
 LOG_FILE_LIMIT=15
 
-# Enable/disable logging of chat messages to the /logs folder (true/false). 
-# Useful for debugging
-LOG_CHAT_ENABLED=false
+# Enable/disable logging of chat messages to the /logs folder (true/false). Useful to debug
+LOG_CHAT_ENABLED=true
 
 # The default fallback provider to use when the model received is not recognized 
 # by this gateway in the fallback rules.
 FALLBACK_PROVIDER=openrouter
 
-# The keys of your providers. Used in the providers.json
-# Fill the ones you want to use or add more if you need
+# The keys of your providers. It can be here (recomended) or in the providers.json file
+# Fill the ones you want to use or add more if you like
 APIKEY_OPENROUTER=<your_openrouter_api_key>
 APIKEY_REQUESTY=<your_requesty_api_key>
 APIKEY_OPENAI=<your_openai_api_key>
 APIKEY_NEBIUS=<your_nebius_api_key>
 APIKEY_TOGETHER=<your_together_api_key>
 APIKEY_KLUSTERAI=<your_klusterai_api_key>
+APIKEY_GOOGLE=<your_google_api_key>
+
 ```
 
 ### Environment Variables
@@ -126,6 +140,13 @@ APIKEY_KLUSTERAI=<your_klusterai_api_key>
 | `LOG_CHAT_ENABLED` | Enable detailed chat logging to `logs/` directory | `true` |
 | `FALLBACK_PROVIDER` | Default provider name for `/v2` if no rule matches | `openrouter` |
 | `APIKEY_PROVIDERNAME` | API key for a specific provider (e.g., `APIKEY_OPENROUTER`) | *required for providers in providers.json* |
+
+
+### Edit providers and fallback rules
+Before starting to use LLMGateway, you need to fill in your providers and models with their fallback rules by accessing the configuration page with your web browser at http://localhost:9100 and you will be redirected to the rules editor. Refer to the following sections to learn how to structure these rules.
+
+
+![Config example](./images/config-example.png)
 
 ## Providers Example (`providers.json`)
 Here, you must define your providers. These providers must be compatible with the OpenAI API format.
@@ -272,6 +293,16 @@ The model rotation feature allows you to distribute requests across multiple pro
 
 The rotation state is tracked per API key and gateway model combination, ensuring consistent behavior for each client.
 
+## Usage Statistics
+From the page http://localhost:9100/v1/ui/usage-stats, you can see your usage statistics.
+
+**Note**: The usage statistics page works best with token usage from OpenRouter API calls. Other providers will most probably be shown with empty values because token usage is not provided by their APIs or does not conform to OpenRouter's structure.
+
+![Config example](./images/statistics-example-01.png)
+
+![Config example](./images/statistics-example-02.png)
+
+
 ## Running
 
 ## With pip
@@ -292,8 +323,3 @@ uv run main.py
 ### With Docker
 if you prefer docker deployment see [this guide](/docker/README.md) (Thanks  [canadaduane](https://github.com/canadaduane)!👍)
 
-
-## Using on Cline
-Once set, you can use it with any local tool that supports services with OpenAI Compatible APIs, like **Cline** and **RooCode**. You just need to configure it as an OpenAI-compatible provider. Here is an example of using this gateway with Cline, set to use the model `'llmgateway/free-stack'`, which only uses models free of charge, as configured in the example above.
-
-![Cline example](./images/cline-example.png)

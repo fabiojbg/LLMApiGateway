@@ -15,7 +15,7 @@ The fastest way to get started is using Docker Compose:
 
 ```bash
 # 1. Create necessary directories
-mkdir -p config data/db
+mkdir -p data/db data/logs
 
 # 2. Copy and edit the configuration files
 # (you must customize these files before starting the container)
@@ -38,7 +38,7 @@ If you prefer to use Docker CLI directly:
 
 ```bash
 # 1. Create necessary directories
-mkdir -p config data/db
+mkdir -p data/db data/logs
 
 # 2. Copy and edit the configuration files
 cp providers.json.example providers.json
@@ -54,6 +54,7 @@ docker run -d \
   -v "$(pwd)/providers.json:/app/providers.json" \
   -v "$(pwd)/models_fallback_rules.json:/app/models_fallback_rules.json" \
   -v "$(pwd)/data/db:/app/db" \
+  -v "$(pwd)/data/logs:/app/logs" \
   -e GATEWAY_API_KEY=your-secure-api-key \
   -e APIKEY_OPENROUTER=your-openrouter-key \
   -e APIKEY_OPENAI=your-openai-key \
@@ -107,6 +108,10 @@ Set any of these environment variables for the providers you want to use:
    - Persists SQLite database for model rotation state
    - Read-write access required
 
+4. **Logs**: `-v ./data/logs:/app/logs`
+   - Persists application chat and access logs
+   - Read-write access required
+
 ## Managing the Container
 
 ### View Logs
@@ -143,7 +148,7 @@ docker-compose down
 
 Once the container is running, you can access:
 
-- Web UI: `http://localhost:9100/v1/ui/rules-editor`
+- Web UI: `http://localhost:9100`
 - API: `http://localhost:9100/v1/chat/completions`
 
 Remember to use the `GATEWAY_API_KEY` in your requests as:
@@ -185,11 +190,11 @@ To upgrade to a newer version:
 ```bash
 # Pull latest code and rebuild
 git pull
-docker-compose build
-
 # Restart the service
-docker-compose down
-docker-compose up -d
+docker compose down
+# Rebuild image and start container
+docker compose up --build -d
+
 ```
 
 ## Production Considerations

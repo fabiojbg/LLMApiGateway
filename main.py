@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # (e.g., initializing database connections, closing clients)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("LLM Gateway v1.10: Application startup...")
+    logger.info("LLM Gateway v1.11: Application startup...")
     # Initialize ConfigLoader and load configurations
     config_loader = ConfigLoader()
     config_loader.load_providers()

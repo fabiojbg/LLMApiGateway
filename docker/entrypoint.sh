@@ -2,7 +2,7 @@
 set -e
 
 echo "LLM Gateway starting..."
-echo "Container logs will be available in the container only and not persisted to host."
+echo "Container logs can be persisted to host via volume mount to /app/logs."
 echo "Container database will be persisted to host via volume mount."
 
 # Create logs directory if it doesn't exist
