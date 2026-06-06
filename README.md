@@ -54,9 +54,14 @@ Before running the gateway, you need to create the configuration files from the 
   - `/` - Redirects to `/v1/ui/rules-editor` (the web-based rules editor).
   - `/v1/models` - lists available models.
   - `/v1/chat/completions` - OpenAI compatible API that routes calls to other providers with fallback in case of call failure.
+    
+    >**HOT FEATURE (Chat Completions):**: The `/v1/chat/completions` endpoint allows you to create a sequence of fallback models to be called in case of failure, with support for retries and custom parameters injection (like the new `service_tier` of OpenRouter which allows reduce model's cost). 
+    
+    > For example, if a model response fails, the gateway can retry the same model after a period of time or automatically move to the next model in the fallback sequence, and so on. The model's sequence can consist of different models and different providers. For instance, the first model in the sequence could be deepseek-chat from OpenRouter, and the gateway can be configured to fall back to gpt-4o from OpenAI in case of failure. This fallback sequence can be of any size and must be configured in the file `models_fallback_rules.json` (either manually or using the new web editor).
 
-  
-  **HOT FEATURE (Chat Completions):**: The `/v1/chat/completions` endpoint allows you to create a sequence of fallback models to be called in case of failure, with support for retries. For example, if a model response fails, the gateway can retry the same model or automatically move to the next model in the fallback sequence, and so on. The model's sequence can consist of different models and different providers. For instance, the first model in the sequence could be deepseek-chat from OpenRouter, and the gateway can be configured to fall back to gpt-4o from OpenAI in case of failure. This fallback sequence can be of any size and must be configured in the file `models_fallback_rules.json` (either manually or using the new web editor).
+## Coding Agent Integration Endpoints
+  - `models/AsGitHubCopilotFormat?includefallback=true|false` - Returns JSON appropriate for copying to the `opencode.jsonc` file so OpenCode can use the LLMApiGateway models (see https://opencode.ai/docs/models/)
+  - `models/AsOpenCodeFormat=true|false` - Returns JSON appropriate for copying to the GitHub Copilot `chatLanguageModels.json` file so Copilot can access LLMGateway models even in free mode.
 
 
 ## Configuration

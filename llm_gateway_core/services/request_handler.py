@@ -15,6 +15,8 @@ async def make_llm_request(target_url: str, headers: dict, payload: dict, is_str
     client = httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=60.0)) 
     payload_to_log = copy.deepcopy(payload)
     payload_to_log["messages"] = "<REMOVED>" # Remove messages from payload for logging
+    if("tools" in payload_to_log):
+        payload_to_log["tools"] = "<REMOVED>" # Remove tools from payload for logging
     logging.debug(f"make_llm_request(): Sending request for model \'{payload_to_log['model']}\'. Payload: {payload_to_log}") # Log the payload without messages
     try:
         if is_streaming:

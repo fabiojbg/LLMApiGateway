@@ -20,7 +20,73 @@ http_client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0)) # Sho
 
 router = APIRouter()
 
-@router.get("/asOpenCode")
+# Default reasoning effort variants applied to gateway models.
+# These map to reasoning effort levels for providers that support it
+# (e.g. OpenAI reasoning_effort, xAI reasoning.effort, Gemini thinking, etc).
+_REASONING_VARIANTS = {
+    "none": {"reasoningEffort": "none"},
+    "minimal": {"reasoningEffort": "minimal"},
+    "low": {"reasoningEffort": "low"},
+    "medium": {"reasoningEffort": "medium"},
+    "high": {"reasoningEffort": "high"},
+    "xhigh": {"reasoningEffort": "xhigh"},
+}
+
+
+def _extract_modalities(model_info: dict) -> dict:
+    """
+    Extract input/output modalities for a model.
+
+    Strategy:
+    - For models that come from a downstream provider (e.g. OpenRouter), copy
+      the values from `architecture.input_modalities` and
+      `architecture.output_modalities` directly when available. The OpenCode
+      client doesn't recognize the "file" modality used by some providers, so
+      we remap it to "pdf" (a superset that OpenCode handles).
+    - For local gateway models, default to text+image inputs (we can be more
+      permissive here because clients may send vision content) and text output.
+    """
+    architecture = model_info.get("architecture")
+    if isinstance(architecture, dict):
+        input_mods = architecture.get("input_modalities")
+        output_mods = architecture.get("output_modalities")
+        if isinstance(input_mods, list) and isinstance(output_mods, list):
+            # Remap "file" -> "pdf" so OpenCode clients accept it, preserving
+            # order and deduping if "pdf" was already present.
+            seen = set()
+            remapped = []
+            for m in input_mods:
+                normalized = "pdf" if m == "file" else m
+                if normalized not in seen:
+                    seen.add(normalized)
+                    remapped.append(normalized)
+            return {"input": remapped, "output": output_mods}
+
+    # Default modalities for gateway-defined models.
+    return {"input": ["text", "image", "pdf"], "output": ["text"]}
+
+
+def _extract_variants(model_info: dict) -> dict:
+    """
+    Extract reasoning effort variants for a model.
+
+    For downstream providers, only include the variants block if the model
+    actually exposes the `reasoning` parameter in `supported_parameters`.
+    For local gateway models, we include the variants by default so clients
+    can request any effort level and the gateway will translate it for the
+    downstream provider.
+    """
+    supported_parameters = model_info.get("supported_parameters")
+    if isinstance(supported_parameters, list):
+        if "reasoning" in supported_parameters:
+            return dict(_REASONING_VARIANTS)
+        return {}
+
+    # Local/gateway model: include all reasoning effort variants by default.
+    return dict(_REASONING_VARIANTS)
+
+
+@router.get("/AsOpenCodeFormat")
 async def get_models_as_opencode(includefallback: bool = False):
     """
     Returns a JSON compatible with opencode.json for configuring this gateway as a provider.
@@ -53,13 +119,14 @@ async def get_models_as_opencode(includefallback: bool = False):
             "limit": {
                 "context": context_length,
                 "output": max_completion_tokens
-            }
+            },
+            "modalities": _extract_modalities(model_info),
+            "variants": _extract_variants(model_info),
         }
         
     api_key = settings.gateway_api_key or "12345678"
     
     return {
-        "$schema": "https://opencode.ai/config.json",
         "provider": {
             "llm-gateway-local": {
                 "npm": "@ai-sdk/openai-compatible",
@@ -76,7 +143,7 @@ async def get_models_as_opencode(includefallback: bool = False):
         }
     }
 
-@router.get("/AsGitHubCopilot")
+@router.get("/AsGitHubCopilotFormat")
 async def get_models_as_github_copilot(includefallback: bool = False):
     """
     Returns a JSON compatible with chatLanguageModels.json for configuring Github Copilot.
