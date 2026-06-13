@@ -2,18 +2,12 @@ import logging
 import os
 import httpx
 import json5
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 # Relative imports from the new structure
-from ...config.loader import ConfigLoader
 from ...config.settings import settings
 
 logger = logging.getLogger(__name__)
-
-# Initialize dependencies needed for this router
-config_loader = ConfigLoader()
-providers_config = config_loader.load_providers()
-fallback_rules = config_loader.load_fallback_rules()
 
 # Initialize HTTP client (consider sharing a client instance across the app via dependency injection later)
 http_client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0)) # Shorter timeout for models endpoint
@@ -87,12 +81,15 @@ def _extract_variants(model_info: dict) -> dict:
 
 
 @router.get("/AsOpenCodeFormat")
-async def get_models_as_opencode(includefallback: bool = False):
+async def get_models_as_opencode(request: Request, includefallback: bool = False):
     """
     Returns a JSON compatible with opencode.json for configuring this gateway as a provider.
     """
+    config_loader = request.app.state.config_loader
+    fallback_rules = config_loader.fallback_rules
+
     # Call the existing get_models to get the list
-    models_data = await get_models()
+    models_data = await get_models(request)
     
     opencode_models = {}
     for model_info in models_data.get("data", []):
@@ -144,12 +141,15 @@ async def get_models_as_opencode(includefallback: bool = False):
     }
 
 @router.get("/AsGitHubCopilotFormat")
-async def get_models_as_github_copilot(includefallback: bool = False):
+async def get_models_as_github_copilot(request: Request, includefallback: bool = False):
     """
     Returns a JSON compatible with chatLanguageModels.json for configuring Github Copilot.
     """
+    config_loader = request.app.state.config_loader
+    fallback_rules = config_loader.fallback_rules
+
     # Call the existing get_models to get the list
-    models_data = await get_models()
+    models_data = await get_models(request)
     
     copilot_models = []
     for model_info in models_data.get("data", []):
@@ -222,11 +222,15 @@ async def get_models_as_github_copilot(includefallback: bool = False):
     }
 
 @router.get("") # Route relative to the prefix defined in v1/__init__.py
-async def get_models():
+async def get_models(request: Request):
     """
     Returns a combined list of models available through the gateway's
     routing rules and the configured fallback provider.
     """
+    config_loader = request.app.state.config_loader
+    fallback_rules = config_loader.fallback_rules
+    providers_config = config_loader.providers_config
+
     gateway_models = {} # Use dict to avoid duplicates easily
     # 1. Add models defined in the gateway's fallback rules
     for model_name in fallback_rules.keys():
