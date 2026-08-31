@@ -53,7 +53,7 @@ You must mantain this structure updated in case of any change in it or in file´
 │   │       ├── __init__.py
 │   │       ├── chat.py     # <--- Defines /v1/chat/completions router
 │   │       ├── models.py   # <--- Defines /v1/models router
-│   │       ├── editor.py   # <--- Defines /v1/ui/rules-editor and /v1/config/models-rules routers
+│   │       ├── rules_editor.py # <--- Defines rules editor and atomic config update routers
 │   │       └── stats.py    # <--- Defines /v1/ui/usage-stats and /v1/usage/tokens routers
 │   ├── services/           # <--- Core Business Logic
 │   │   ├── __init__.py
@@ -82,6 +82,7 @@ You must mantain this structure updated in case of any change in it or in file´
 │   ├── usage-stats.html    # <--- HTML for the usage statistics
 │   ├── usage-stats.css     # <--- CSS for the usage statistics
 │   └── usage-stats.js      # <--- JavaScript for the usage statistics
+├── tests/                  # <--- Pytest regression and integration tests
 └── memory-bank/            # <--- Project context files (structure unchanged)
 ```
 
@@ -90,13 +91,14 @@ You must mantain this structure updated in case of any change in it or in file´
 Here is a brief overview of the key modules and their responsibilities:
 You must mantain this section updated to allways reflect the actual module responsibilities
 
-*   **`main.py`:** Initializes the FastAPI application, includes API routers from `llm_gateway_core/api/v1/` (including the editor router), applies middleware, handles startup/shutdown events (including `ConfigLoader` initialization and making it available via `app.state`), serves static files from `static/`, and runs the Uvicorn server.
+*   **`main.py`:** Initializes the FastAPI application, includes API routers from `llm_gateway_core/api/v1/` (including the editor router), applies middleware, handles startup/shutdown resources (configuration, token-usage retention cleanup, and the shared downstream HTTP client), serves static files from `static/`, and runs the Uvicorn server.
 *   **`llm_gateway_core/api/v1/chat.py`:** Defines the `APIRouter` for the `/v1/chat/completions` endpoint. Delegates request handling to `services/request_handler.py`.
 *   **`llm_gateway_core/api/v1/models.py`:** Defines the `APIRouter` for the `/v1/models` endpoint. Delegates request handling to `services/request_handler.py`.
-*   **`llm_gateway_core/api/v1/editor.py`:** Defines the `APIRouter` for:
+*   **`llm_gateway_core/api/v1/rules_editor.py`:** Defines the `APIRouter` for:
     *   `GET /v1/ui/rules-editor`: Serves the HTML page for the `models_fallback_rules.json` editor.
     *   `GET /v1/config/models-rules`: Fetches the current content of `models_fallback_rules.json`.
-    *   `POST /v1/config/models-rules`: Validates, saves the updated `models_fallback_rules.json`, and triggers a configuration reload via `ConfigLoader`.
+    *   `POST /v1/config/models-rules`: Validates and atomically saves `models_fallback_rules.json` via `ConfigLoader`.
+    *   Equivalent provider configuration endpoints for reading and atomically updating `providers.json`.
 *   **`llm_gateway_core/api/v1/stats.py`:** Defines the `APIRouter` for:
     *   `GET /v1/ui/usage-stats`: Serves the HTML page for the usage statistics.
     *   `GET /v1/api/usage-stats/{period}`: Fetches aggregated token usage statistics by period and model from `db/tokens_usage_db.py`.
@@ -109,9 +111,10 @@ You must mantain this section updated to allways reflect the actual module respo
     *   Handling streaming/non-streaming responses.
     *   Managing retries and fallback logic.
     *   Fetching model lists for the `/v1/models` endpoint.
-*   **`llm_gateway_core/config/loader.py`:** Contains the `ConfigLoader` class responsible for reading, parsing, and validating `providers.json` and `models_fallback_rules.json`. Includes the `reload_fallback_rules()` method for dynamic updates of the model rules.
+*   **`llm_gateway_core/config/loader.py`:** Contains the `ConfigLoader` class responsible for reading, cross-validating, reloading, and atomically persisting `providers.json` and `models_fallback_rules.json` without partially applying failed updates.
 *   **`llm_gateway_core/config/settings.py`:** Contains the Pydantic `Settings` class.
-*   **`llm_gateway_core/db/model_rotation_db.py`:** Contains the `ModelRotationDB` class for interacting with the SQLite database for model rotation state.
-*   **`llm_gateway_core/db/tokens_usage_db.py`:** Contains the `TokensUsageDB` class for interacting with the SQLite database for storing and retrieving tokens usage statistics.
+*   **`llm_gateway_core/db/model_rotation_db.py`:** Contains the `ModelRotationDB` class for atomically advancing SQLite-backed model rotation state under concurrent requests.
+*   **`llm_gateway_core/db/tokens_usage_db.py`:** Contains the `TokensUsageDB` class for storing, querying, paginating, and applying retention to token usage statistics.
 *   **`llm_gateway_core/middleware/`:** Contains the middleware functions (authentication, chat logging, request logging).
 *   **`llm_gateway_core/utils/logging_setup.py`:** Contains the logging configuration logic.
+*   **`tests/`:** Contains pytest coverage for HTTP lifecycle and streaming, fallback/retry behavior, atomic configuration updates, rotation concurrency, chat logging, and usage persistence.

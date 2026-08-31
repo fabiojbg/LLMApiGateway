@@ -1,189 +1,269 @@
-from fastapi.responses import StreamingResponse
-import httpx
+from __future__ import annotations
+
+import copy
+import json
 import logging
-import json5
-import copy 
+import re
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 
-# --- Helper Function for making the actual request ---
-async def make_llm_request(target_url: str, headers: dict, payload: dict, is_streaming: bool):
-    """Makes the downstream request and handles streaming/non-streaming responses."""
-    looking_first_chunk = True
-    error_in_stream = False
-    error_detail = None
-    tokens_usage = None
+import httpx
+from fastapi.responses import StreamingResponse
 
-    client = httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=60.0)) 
+from ..config.settings import settings
+
+
+_SSE_EVENT_DELIMITER = re.compile(br"\r?\n\r?\n")
+
+
+@dataclass(frozen=True)
+class SSEEvent:
+    """A parsed server-sent event and its combined data field."""
+
+    raw: bytes
+    data: str | None
+
+
+class SSEParser:
+    """Incrementally parse complete SSE events from arbitrary byte chunks."""
+
+    def __init__(self) -> None:
+        self._buffer = bytearray()
+
+    def feed(self, chunk: bytes) -> list[SSEEvent]:
+        self._buffer.extend(chunk)
+        events: list[SSEEvent] = []
+
+        while match := _SSE_EVENT_DELIMITER.search(self._buffer):
+            end = match.end()
+            raw = bytes(self._buffer[:end])
+            event_body = bytes(self._buffer[: match.start()])
+            del self._buffer[:end]
+            events.append(SSEEvent(raw=raw, data=self._extract_data(event_body)))
+
+        return events
+
+    @staticmethod
+    def _extract_data(event_body: bytes) -> str | None:
+        data_lines: list[str] = []
+        for raw_line in event_body.replace(b"\r\n", b"\n").split(b"\n"):
+            if raw_line.startswith(b":"):
+                continue
+            field, separator, value = raw_line.partition(b":")
+            if field != b"data":
+                continue
+            if separator and value.startswith(b" "):
+                value = value[1:]
+            data_lines.append(value.decode("utf-8"))
+        return "\n".join(data_lines) if data_lines else None
+
+
+def _parse_data_payload(data: str) -> dict | None:
+    if data.strip() == "[DONE]":
+        return None
+    parsed = json.loads(data)
+    if not isinstance(parsed, dict):
+        raise ValueError("SSE data payload must be a JSON object")
+    return parsed
+
+
+def _stream_error_detail(event_data: str, payload: dict) -> str | None:
+    if "error" not in payload and "detail" not in payload:
+        return None
+    error = payload.get("error")
+    if isinstance(error, dict):
+        return str(error.get("message") or error)
+    return str(error or payload.get("detail") or event_data)
+
+
+async def _close_stream(response: httpx.Response) -> None:
+    if not response.is_closed:
+        await response.aclose()
+
+
+async def make_llm_request(
+    http_client: httpx.AsyncClient,
+    target_url: str,
+    headers: dict,
+    payload: dict,
+    is_streaming: bool,
+):
+    """Make one downstream request using the application-owned HTTP client."""
     payload_to_log = copy.deepcopy(payload)
-    payload_to_log["messages"] = "<REMOVED>" # Remove messages from payload for logging
-    if("tools" in payload_to_log):
-        payload_to_log["tools"] = "<REMOVED>" # Remove tools from payload for logging
-    logging.debug(f"make_llm_request(): Sending request for model \'{payload_to_log['model']}\'. Payload: {payload_to_log}") # Log the payload without messages
+    payload_to_log["messages"] = "<REMOVED>"
+#    if "tools" in payload_to_log:
+#        payload_to_log["tools"] = "<REMOVED>"
+    logging.debug(
+        "make_llm_request(): Sending request for model '%s'. Payload: %s",
+        payload_to_log.get("model"),
+        payload_to_log,
+    )
+
     try:
-        if is_streaming:
-            async def stream_generator():
-                nonlocal looking_first_chunk, error_in_stream, error_detail, tokens_usage
-                async with client.stream("POST", target_url, headers=headers, json=payload, timeout=None) as response:
-                    # Check initial status code for non-2xx errors before streaming
-                    if response.status_code >= 400:
-                         error_detail = await response.aread()
-                         error_detail = error_detail.decode('utf-8')
-                         logging.error(f"Downstream error {response.status_code} from {target_url}: {error_detail}")
-                         error_in_stream = True 
-                         return # Stop the generator
+        if not is_streaming:
+            response = await http_client.post(target_url, headers=headers, json=payload)
+            logging.debug("Response received from %s", target_url)
 
-                    buffer = ""
-                    # Stream the response
-                    async for chunk in response.aiter_bytes():
-                        try:
-                            text = chunk.decode('utf-8')
-                            buffer += text
-                            parts = buffer.split("\n\n")
-                            # Keep the last part in buffer if incomplete
-                            buffer = parts.pop() if not buffer.endswith("\n\n") else ""
-                            for chunk_str in parts:
-                                if not chunk_str.startswith("data: {"): 
-                                    logging.debug(f"Passing dummy chunk through: {chunk_str[:1000]}...")
-                                    continue
-
-                                if looking_first_chunk:
-                                    looking_first_chunk = False 
-                                    logging.debug(f"Processing first *real* chunk from {target_url}: {chunk_str[:1000]}...")
-                                    chunk_json = json5.loads(chunk_str[len("data: "):])
-                                    if "error" in chunk_json or "detail" in chunk_json:
-                                        error_detail = chunk_str 
-                                        error_in_stream = True
-                                        logging.warning(f"Error detected in first *real* stream chunk from {target_url}: {error_detail}")
-                                        return 
-                        except Exception as e:
-                            logging.warning(f"StreamGenerator: Unexpected error processing chunk. Skipping content check for this chunk. Error={e}. Chunk={chunk[:4000]}")
-                            if looking_first_chunk:
-                                pass
-
-                        if chunk:
-                            yield chunk
-                        else: 
-                            logging.debug(f"Skipping empty chunk received from {target_url}")
-
-            gen = stream_generator()
-            first_content_chunk_candidate = None
-            buffer = ""
-            # Prime until the first real data chunk
-            while True:
-                try:
-                    chunk = await gen.__anext__()
-                except StopAsyncIteration:
-                    break
-                try:
-                    text = chunk.decode('utf-8')
-                    buffer += text
-                    parts = buffer.split("\n\n")
-                    # Keep the last part in buffer if incomplete
-                    buffer = parts.pop() if not buffer.endswith("\n\n") else ""
-
-                    real_found = False
-                    for part in parts:
-                        if part.startswith("data: {"):
-                            real_found = True
-                            data_json = json5.loads(part[len("data: "):])
-                            if "error" in data_json or "detail" in data_json:
-                                error_detail = part
-                                error_in_stream = True
-                            else:
-                                first_content_chunk_candidate = chunk
-                            break
-                    if real_found:
-                        break
-                except UnicodeDecodeError:
-                    continue
-
-            if error_in_stream:
-                return None, error_detail
-
-            async def combined_generator():
-                nonlocal error_in_stream, error_detail
-
-                # Yield the first real data chunk
-                if first_content_chunk_candidate is not None:
-                    logging.debug(f"Yielding first real chunk from {target_url}: {first_content_chunk_candidate[:1000]}...")
-                    yield first_content_chunk_candidate
-                    # Yield the rest
-                buffer = ""
-                async for chunk in gen:
-                    try:
-                        text = chunk.decode('utf-8')
-                        buffer += text
-                        parts = buffer.split("\n\n")
-                        # Keep the last part in buffer if incomplete
-                        buffer = parts.pop() if not buffer.endswith("\n\n") else ""
-
-                        for chunk_str in parts:
-                            #print(f".", end='')  # indicates some chunk is being processed
-                            if not chunk_str.startswith("data: {"):
-                                continue
-                            try:                               
-                                chunk_json = json5.loads(chunk_str[len("data: "):])
-                                if "code" in chunk_json : # try if is an error chunk(openrouter)
-                                    # Attempt to parse as JSON to get detail
-                                    try:
-                                        error_detail = chunk_json.get("error", {}).get("message") or chunk_json.get("detail")
-                                    except:
-                                        error_detail = chunk_str # Fallback to raw chunk
-                                    logging.warning(f"Error detected in stream chunk from {target_url}: {error_detail}. Error={e}")
-                                    error_in_stream = True
-                                    error_detail = chunk_str
-
-                                if "usage" in chunk_json:
-                                    tokens_usage = chunk_json.get("usage")
-                            except Exception as e:
-                                logging.warning(f"CombinedGenerator: Could not decode chunk part. Skipping part. Error={e}. Chunk_part={chunk_str}", exc_info=True)
-
-                    except Exception as e:
-                        logging.warning(f"CombinedGenerator: Could not decode chunk. Skipping content check for this chunk. Error={e}. Chunk={chunk}")
-                        
-                    logging.debug(f"Yielding chunk from {target_url}: {chunk[:1000]}...")  
-                    yield chunk
-
-                logging.info(f"Finished streaming from {target_url}. Token Usage: {tokens_usage if tokens_usage else ''}")
-
-            return StreamingResponse(
-                combined_generator(),
-                media_type="text/event-stream",
-                headers={"Transfer-Encoding": "chunked", "X-Accel-Buffering": "no"}
-            ), error_detail
-        
-        else:
-            serialized_payload = json5.dumps(payload).encode("utf-8")
-            # Non-streaming request
-            response = await client.post(target_url, headers=headers, content=serialized_payload, timeout=None)
-            logging.debug(f"Response received from {target_url}")
-            
-            # Check for HTTP errors
             if response.status_code >= 400:
                 error_detail = response.text
-                logging.warning(f"Downstream error {response.status_code} from {target_url}: {error_detail}")
-                return None, error_detail # Signal error
+                logging.warning(
+                    "Downstream error %s from %s: %s",
+                    response.status_code,
+                    target_url,
+                    error_detail,
+                )
+                return None, error_detail
 
-            # Check for errors in the JSON response body
             try:
                 response_json = response.json()
-                if "error" in response_json or "detail" in response_json:
-                     error_detail = response_json.get("error", {}).get("message") or response_json.get("detail")
-                     logging.warning(f"Error detected in non-stream response from {target_url}: {error_detail}")
-                     return None, error_detail # Signal error
-                return response_json, None # Success
-            except json5.JSONDecodeError as json_err:
-                 # Handle cases where the response is not valid JSON despite a 2xx status
-                 error_detail = f"Invalid JSON response from {target_url}. Error={e}. Response= {response.text[:1000]}..."
-                 logging.error(error_detail, exc_info=True)
-                 return None, error_detail # Signal error
+            except ValueError as json_error:
+                error_detail = (
+                    f"Invalid JSON response from {target_url}. "
+                    f"Error={json_error}. Response={response.text[:1000]}..."
+                )
+                logging.error(error_detail)
+                return None, error_detail
 
-    except httpx.RequestError as e:
-        # Handle network errors, timeouts, etc.
-        error_detail = f"RequestError connecting to {target_url}: {str(e)}"
+            if "error" in response_json or "detail" in response_json:
+                error = response_json.get("error")
+                if isinstance(error, dict):
+                    error = error.get("message") or error
+                error_detail = str(error or response_json.get("detail"))
+                logging.warning(
+                    "Error detected in non-stream response from %s: %s",
+                    target_url,
+                    error_detail,
+                )
+                return None, error_detail
+            return response_json, None
+
+        request = http_client.build_request(
+            "POST", target_url, headers=headers, json=payload
+        )
+        response = await http_client.send(request, stream=True)
+
+        if response.status_code >= 400:
+            try:
+                error_detail = (await response.aread()).decode(
+                    "utf-8", errors="replace"
+                )
+            finally:
+                await _close_stream(response)
+            logging.error(
+                "Downstream error %s from %s: %s",
+                response.status_code,
+                target_url,
+                error_detail,
+            )
+            return None, error_detail
+
+        parser = SSEParser()
+        upstream_iterator = response.aiter_bytes()
+        primed_chunks: list[bytes] = []
+        prefetched_bytes = 0
+        prefetched_events = 0
+        first_data_seen = False
+
+        try:
+            async for chunk in upstream_iterator:
+                if not chunk:
+                    continue
+                primed_chunks.append(chunk)
+                prefetched_bytes += len(chunk)
+                events = parser.feed(chunk)
+                prefetched_events += len(events)
+                for event in events:
+                    if event.data is None or event.data.strip() == "[DONE]":
+                        continue
+                    try:
+                        event_payload = _parse_data_payload(event.data)
+                    except (UnicodeDecodeError, ValueError) as parse_error:
+                        await _close_stream(response)
+                        return None, (
+                            f"Invalid SSE JSON response from {target_url}: {parse_error}"
+                        )
+                    if event_payload is None:
+                        continue
+                    error_detail = _stream_error_detail(event.data, event_payload)
+                    if error_detail is not None:
+                        await _close_stream(response)
+                        return None, error_detail
+                    first_data_seen = True
+                    break
+                if first_data_seen:
+                    break
+                if (
+                    prefetched_bytes > settings.http_stream_prefetch_max_bytes
+                    or prefetched_events > settings.http_stream_prefetch_max_events
+                ):
+                    await _close_stream(response)
+                    return None, (
+                        f"Provider stream prefetch limit exceeded for {target_url} "
+                        f"({prefetched_bytes} bytes, {prefetched_events} events)"
+                    )
+        except BaseException:
+            await _close_stream(response)
+            raise
+
+        if not first_data_seen:
+            await _close_stream(response)
+            return None, f"Empty provider stream from {target_url}"
+
+        async def combined_generator() -> AsyncIterator[bytes]:
+            stream_parser = parser
+            try:
+                for primed_chunk in primed_chunks:
+                    yield primed_chunk
+
+                async for chunk in upstream_iterator:
+                    if not chunk:
+                        continue
+                    stop_after_chunk = False
+                    for event in stream_parser.feed(chunk):
+                        if event.data is None or event.data.strip() == "[DONE]":
+                            continue
+                        try:
+                            event_payload = _parse_data_payload(event.data)
+                        except (UnicodeDecodeError, ValueError) as parse_error:
+                            logging.warning(
+                                "Invalid SSE event after streaming started from %s: %s",
+                                target_url,
+                                parse_error,
+                            )
+                            stop_after_chunk = True
+                            break
+                        if event_payload is None:
+                            continue
+                        if error_detail := _stream_error_detail(
+                            event.data, event_payload
+                        ):
+                            logging.warning(
+                                "Error after streaming started from %s: %s",
+                                target_url,
+                                error_detail,
+                            )
+                            stop_after_chunk = True
+                            break
+                    yield chunk
+                    if stop_after_chunk:
+                        break
+            finally:
+                await _close_stream(response)
+
+        return (
+            StreamingResponse(
+                combined_generator(),
+                media_type="text/event-stream",
+                headers={"X-Accel-Buffering": "no"},
+            ),
+            None,
+        )
+
+    except httpx.RequestError as error:
+        error_detail = f"RequestError connecting to {target_url}: {error}"
         logging.error(error_detail, exc_info=True)
-        return None, error_detail # Signal error
-    except Exception as e:
-        # Catch unexpected errors during request processing
-        error_detail = f"Unexpected error during request to {target_url}: {str(e)}"
+        return None, error_detail
+    except Exception as error:
+        error_detail = f"Unexpected error during request to {target_url}: {error}"
         logging.error(error_detail, exc_info=True)
-        return None, error_detail # Signal error
+        return None, error_detail

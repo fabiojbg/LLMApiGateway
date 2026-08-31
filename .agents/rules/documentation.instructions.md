@@ -188,13 +188,14 @@ In this mode (`rotate_models=true`), the gateway cycles through all models betwe
 ```
 
 #### Custom Parameters and Headers Injection/Override
-For any model, you can inject or override custom headers or body parameters by specifing it in the rules.
-Here is an example of using grok-3-mini-beta from xAI that accepts an `reasoning_effort` parameter.
-Custom headers a also available if needed.
+For any model, you can inject custom headers or body parameters by specifying them in the rules.
+By default, caller-provided parameters take precedence over `custom_body_params` (the gateway only injects missing parameters). If you want the gateway parameters to take precedence and override whatever the caller sends, set `"override": true` (or `"override": "true"`) inside `custom_body_params`.
+
+Here is an example configuring custom body parameters (with override) and headers:
 ```json
 [
     {
-        // an example of a model with custom body
+        // an example of a model with custom body and override
         "gateway_model_name": "llmgateway/xAI", 
         "fallback_models" :
         [
@@ -202,6 +203,11 @@ Custom headers a also available if needed.
                 "provider": "xAI",
                 "model" : "grok-3-mini-beta",                
                 "custom_body_params" : {
+                    "override": true, // when true, overrides parameters sent by the caller instead of keeping caller defaults
+                    "provider": {
+                        "sort": "throughput",
+                        "quantizations": [ "fp8" ]
+                    },
                     "reasoning": { "effort": "high" }  // grok has this reasoning/effort parameter that can be set like this
                 },
                 "custom_headers" : {

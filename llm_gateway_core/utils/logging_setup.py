@@ -1,8 +1,5 @@
 import os
-from dotenv import load_dotenv
-import logging
 from logging.config import dictConfig
-from pydantic_settings import BaseSettings
 from pythonjsonlogger.jsonlogger import JsonFormatter
 
 class CustomJsonFormatter(JsonFormatter):
@@ -42,7 +39,7 @@ def configure_logging():
         },
         'root': {
             'handlers': ['console', 'file'],
-            'level': 'INFO'
+            'level': os.getenv('LOG_LEVEL', 'INFO').upper()
         },
         'loggers': {
             'httpcore': {

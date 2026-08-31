@@ -1,11 +1,13 @@
+import asyncio
 import logging
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from pathlib import Path
 
 # Import the TokensUsageDB
-from llm_gateway_core.db.tokens_usage_db import TokensUsageDB
+from llm_gateway_core.config.settings import settings
+from llm_gateway_core.db.tokens_usage_db import TokensUsageDB, TokensUsageDBError
 
 stats_router = APIRouter()
 
@@ -54,16 +56,27 @@ async def get_aggregated_stats(request: Request, period: str):
         elif period == 'month':
             start_date = end_date - timedelta(days=365) # Approximately 12 months
 
-        aggregated_data = tokens_usage_db.get_aggregated_usage(period, start_date=start_date, end_date=end_date)
+        aggregated_data = await asyncio.to_thread(
+            tokens_usage_db.get_aggregated_usage,
+            period,
+            start_date,
+            end_date,
+        )
         return JSONResponse(content=aggregated_data)
     except HTTPException as he:
         raise he
-    except Exception as e:
+    except TokensUsageDBError as e:
         logging.error(f"Error fetching aggregated usage statistics for period '{period}': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Could not retrieve usage statistics: {e}")
+        raise HTTPException(status_code=500, detail="Could not retrieve usage statistics.")
 
 @stats_router.get("/api/usage-records", response_class=JSONResponse, tags=["Usage Stats API"])
-async def get_usage_records(request: Request, limit: int = 25, offset: int = 0):
+async def get_usage_records(
+    request: Request,
+    limit: int = Query(default=25, ge=1, le=settings.usage_records_max_limit),
+    offset: int = Query(
+        default=0, ge=0, le=settings.usage_records_max_offset
+    ),
+):
     """
     Fetches the latest token usage records with pagination.
     """
@@ -73,11 +86,17 @@ async def get_usage_records(request: Request, limit: int = 25, offset: int = 0):
         raise HTTPException(status_code=500, detail="Internal server error: TokensUsageDB not available.")
     
     try:
-        records = tokens_usage_db.get_latest_usage_records(limit=limit, offset=offset)
-        total_records = tokens_usage_db.get_total_records_count()
+        records, total_records = await asyncio.gather(
+            asyncio.to_thread(
+                tokens_usage_db.get_latest_usage_records,
+                limit,
+                offset,
+            ),
+            asyncio.to_thread(tokens_usage_db.get_total_records_count),
+        )
         return JSONResponse(content={"records": records, "total_records": total_records})
     except HTTPException as he:
         raise he
-    except Exception as e:
+    except TokensUsageDBError as e:
         logging.error(f"Error fetching usage records: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Could not retrieve usage records: {e}")
+        raise HTTPException(status_code=500, detail="Could not retrieve usage records.")

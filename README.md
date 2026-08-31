@@ -1,4 +1,8 @@
 
+<p align="center">
+  <img src="images/logo.png" alt="LLM Gateway Logo" width="180" />
+</p>
+
 # Fault-Tolerant Personal LLM Gateway
 ---
 <div align="center" style="text-align: center;">
@@ -115,9 +119,32 @@ LOG_FILE_LIMIT=15
 # Enable/disable logging of chat messages to the /logs folder (true/false). Useful to debug
 LOG_CHAT_ENABLED=true
 
+# Maximum request/response characters retained by each detailed chat log
+LOG_CHAT_REQUEST_MAX_CHARS=1048576
+LOG_CHAT_RESPONSE_MAX_CHARS=1048576
+
 # The default fallback provider to use when the model received is not recognized 
 # by this gateway in the fallback rules.
 FALLBACK_PROVIDER=openrouter
+
+# Downstream provider HTTP timeouts, in seconds
+HTTP_CONNECT_TIMEOUT=60
+HTTP_READ_TIMEOUT=300
+HTTP_WRITE_TIMEOUT=60
+HTTP_POOL_TIMEOUT=60
+
+# Maximum data buffered while validating the beginning of an SSE stream
+HTTP_STREAM_PREFETCH_MAX_BYTES=1048576
+HTTP_STREAM_PREFETCH_MAX_EVENTS=256
+
+# Validation ceilings for per-model retry settings
+MAX_RETRY_COUNT=10
+MAX_RETRY_DELAY_SECONDS=120
+
+# Usage history retention and pagination limits
+TOKENS_USAGE_RETENTION_DAYS=180
+USAGE_RECORDS_MAX_LIMIT=500
+USAGE_RECORDS_MAX_OFFSET=1000000
 
 # The keys of your providers. It can be here (recomended) or in the providers.json file
 # Fill the ones you want to use or add more if you like
@@ -138,12 +165,27 @@ APIKEY_GOOGLE=<your_google_api_key>
 | `GATEWAY_API_KEY` | Fixed API key clients must use to access this gateway | *required* |
 | `LOG_FILE_LIMIT` | Maximum number of chat log files to keep | `15` |
 | `LOG_CHAT_ENABLED` | Enable detailed chat logging to `logs/` directory | `true` |
-| `FALLBACK_PROVIDER` | Default provider name for `/v2` if no rule matches | `openrouter` |
+| `LOG_CHAT_REQUEST_MAX_CHARS` | Maximum request characters retained in a detailed chat log | `1048576` |
+| `LOG_CHAT_RESPONSE_MAX_CHARS` | Maximum response characters retained in a detailed chat log | `1048576` |
+| `FALLBACK_PROVIDER` | Provider used when the requested model has no matching rule | `openrouter` |
+| `HTTP_CONNECT_TIMEOUT` | Downstream connection timeout, in seconds | `60` |
+| `HTTP_READ_TIMEOUT` | Downstream read timeout, in seconds | `300` |
+| `HTTP_WRITE_TIMEOUT` | Downstream write timeout, in seconds | `60` |
+| `HTTP_POOL_TIMEOUT` | Downstream connection-pool timeout, in seconds | `60` |
+| `HTTP_STREAM_PREFETCH_MAX_BYTES` | Maximum bytes buffered before an SSE stream is accepted | `1048576` |
+| `HTTP_STREAM_PREFETCH_MAX_EVENTS` | Maximum SSE events buffered before a stream is accepted | `256` |
+| `MAX_RETRY_COUNT` | Maximum accepted `retry_count` in a fallback rule | `10` |
+| `MAX_RETRY_DELAY_SECONDS` | Maximum accepted `retry_delay`, in seconds | `120` |
+| `TOKENS_USAGE_RETENTION_DAYS` | Number of days retained in token usage history | `180` |
+| `USAGE_RECORDS_MAX_LIMIT` | Maximum page size accepted by the usage-records API | `500` |
+| `USAGE_RECORDS_MAX_OFFSET` | Maximum offset accepted by the usage-records API | `1000000` |
 | `APIKEY_PROVIDERNAME` | API key for a specific provider (e.g., `APIKEY_OPENROUTER`) | *required for providers in providers.json* |
 
 
 ### Edit providers and fallback rules
 Before starting to use LLMGateway, you need to fill in your providers and models with their fallback rules by accessing the configuration page with your web browser at http://localhost:9100 and you will be redirected to the rules editor. Refer to the following sections to learn how to structure these rules.
+
+Provider and fallback-rule updates are validated before they become active. The editor writes a temporary file in the same directory, flushes it to disk, and atomically replaces the previous file only after validation succeeds. Invalid input returns HTTP 400; persistence failures return HTTP 500 and leave the in-memory configuration unchanged. JSON5 comments and formatting are preserved because the validated source text is stored as submitted.
 
 
 ![Config example](./images/config-example.png)
@@ -216,6 +258,8 @@ Retries can be also configured for each model.
 ]
 ```
 
+`retry_count` is the number of retries after the initial call, so `retry_count: 3` allows up to four attempts. A positive `retry_count` requires `retry_delay`; the delay is applied only between failed attempts. Both values must respect `MAX_RETRY_COUNT` and `MAX_RETRY_DELAY_SECONDS`. Retry configuration is ignored when model rotation is enabled.
+
 #### Model Rotation
 In this mode (`rotate_models=true`), the gateway cycles through all models between requests. This is useful when we want to utilize credits from various providers. Fallback also works in this mode in case of failures; the sequence loops back to the first model when the sequence finishes.
 ```json
@@ -245,13 +289,14 @@ In this mode (`rotate_models=true`), the gateway cycles through all models betwe
 ```
 
 #### Custom Parameters and Headers Injection/Override
-For any model, you can inject or override custom headers or body parameters by specifing it in the rules.
-Here is an example of using grok-3-mini-beta from xAI that accepts an `reasoning_effort` parameter.
-Custom headers a also available if needed.
+For any model, you can inject custom headers or body parameters by specifying them in the rules.
+By default, caller-provided parameters take precedence over `custom_body_params` (the gateway only injects missing parameters). If you want the gateway parameters to take precedence and override whatever the caller sends, set `"override": true` (or `"override": "true"`) inside `custom_body_params`.
+
+Here is an example configuring custom body parameters (with override) and headers:
 ```json
 [
     {
-        // an example of a model with custom body
+        // an example of a model with custom body and override
         "gateway_model_name": "llmgateway/xAI", 
         "fallback_models" :
         [
@@ -259,6 +304,11 @@ Custom headers a also available if needed.
                 "provider": "xAI",
                 "model" : "grok-3-mini-beta",                
                 "custom_body_params" : {
+                    "override": true, // when true, overrides parameters sent by the caller instead of keeping caller defaults
+                    "provider": {
+                        "sort": "throughput",
+                        "quantizations": [ "fp8" ]
+                    },
                     "reasoning": { "effort": "high" }  // grok has this reasoning/effort parameter that can be set like this
                 },
                 "custom_headers" : {
@@ -293,10 +343,22 @@ The model rotation feature allows you to distribute requests across multiple pro
 
 The rotation state is tracked per API key and gateway model combination, ensuring consistent behavior for each client.
 
+Rotation updates are performed atomically in SQLite, so concurrent requests for the same API key and gateway model receive successive indexes without losing increments. The first selection for a new pair is index `0`.
+
+### Downstream HTTP and streaming
+
+The application creates one shared `httpx.AsyncClient` during startup and closes it during shutdown. All provider calls and model-list requests reuse this client and the four configurable timeout values above.
+
+Streaming responses are parsed incrementally as SSE, including fragmented events, LF or CRLF separators, keepalive lines, and the `[DONE]` marker. The gateway validates only a bounded prefetch window before exposing the stream. If a provider fails before streaming starts, fallback remains available; after bytes have been exposed to the client, an error terminates that stream instead of switching providers mid-response.
+
 ## Usage Statistics
 From the page http://localhost:9100/v1/ui/usage-stats, you can see your usage statistics.
 
 **Note**: The usage statistics page works best with token usage from OpenRouter API calls. Other providers will most probably be shown with empty values because token usage is not provided by their APIs or does not conform to OpenRouter's structure.
+
+Usage database work is dispatched outside the async event loop. Old records are cleaned up once at application startup according to `TOKENS_USAGE_RETENTION_DAYS`; a cleanup failure is logged but does not prevent startup. The records endpoint validates `limit` and `offset` against the configured bounds and returns a server error when a database query fails rather than presenting the failure as an empty result.
+
+Detailed chat logging is incremental and does not delay streamed chunks while waiting for persistence. Request and response text retained for each log is bounded by the corresponding character limits, while usage extraction continues across the complete response stream.
 
 ![Config example](./images/statistics-example-01.png)
 
@@ -318,6 +380,24 @@ if uv is installed, simply do:
 ```bash
 uv venv
 uv run main.py
+```
+
+## Development checks
+
+Development test dependencies are declared in the `dev` dependency group and mirrored in `requirements.txt` for pip users.
+
+```bash
+# uv
+uv sync --dev
+uv run pytest -q
+
+# pip
+pip install -r requirements.txt
+pytest -q
+
+# lint and syntax checks (Ruff is run without adding it to runtime dependencies)
+uvx ruff check . --select E9,F
+python -m compileall -q main.py llm_gateway_core tests
 ```
 
 ### With Docker

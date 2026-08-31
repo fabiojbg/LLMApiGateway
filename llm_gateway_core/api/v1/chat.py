@@ -4,7 +4,6 @@ import copy
 import asyncio
 import os
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import StreamingResponse
 
 # Relative imports from the new structure
 from ...config.loader import ConfigLoader
@@ -20,6 +19,7 @@ router = APIRouter()
 @router.post("/completions")
 async def chat_completions(request: Request):
     config_loader_instance: ConfigLoader = request.app.state.config_loader
+    http_client = request.app.state.http_client
     if not config_loader_instance:
         logging.error("ConfigLoader not found in application state within chat_completions.")
         # It's good practice to log this, as it indicates a setup issue in main.py or app lifecycle
@@ -85,12 +85,42 @@ async def chat_completions(request: Request):
         provider_name = model_fallback_rule.get("provider")
         provider_model = model_fallback_rule.get("model")
         retry_delay = model_fallback_rule.get("retry_delay")
-        retry_count = model_fallback_rule.get("retry_count") or 0
+        configured_retry_count = model_fallback_rule.get("retry_count") or 0
+        retry_count = configured_retry_count
+        if (
+            type(retry_count) is not int
+            or retry_count < 0
+            or retry_count > settings.max_retry_count
+            or (
+                retry_count > 0
+                and (
+                    type(retry_delay) is not int
+                    or retry_delay < 1
+                    or retry_delay > settings.max_retry_delay_seconds
+                )
+            )
+        ):
+            logging.error(
+                "Ignoring invalid retry configuration for model '%s': "
+                "retry_count=%r, retry_delay=%r",
+                provider_model,
+                configured_retry_count,
+                retry_delay,
+            )
+            retry_count = 0
         subproviders_ordering = model_fallback_rule.get("providers_order") # openrouter support for subproviders ordering
 
         logging.info(f"Attempting  model '{requested_model}' in provider: {provider_name} for subproviders ordering: {subproviders_ordering}")
 
         provider_config = providers_config.get(provider_name)
+
+        if provider_config is None:
+            last_error_detail = (
+                f"Provider '{provider_name}' is not configured for model "
+                f"'{provider_model}'."
+            )
+            logging.error(last_error_detail)
+            continue
 
         provider_base_url = provider_config.baseUrl
         api_key_env_var_or_keyvalue = provider_config.apikey
@@ -115,18 +145,30 @@ async def chat_completions(request: Request):
             payload["usage"] = {"include": True }
         custom_body_params = model_fallback_rule.get("custom_body_params", {})
         if custom_body_params:
+            override_raw = custom_body_params.get("override", False)
+            if isinstance(override_raw, str):
+                should_override = override_raw.strip().lower() in ("true", "1")
+            else:
+                should_override = bool(override_raw)
+
             for key, value in custom_body_params.items():
-                payload[key] = value
+                if key == "override":
+                    continue
+                if should_override or key not in payload:
+                    payload[key] = value
         custom_headers = model_fallback_rule.get("custom_headers", {})
         if custom_headers:
             for key, value in custom_headers.items():
                 headers[key] = value
 
-        # --- Handle Different Provider Types ---
-        
-        while retry_count >= 0:
+        # Rotation deliberately ignores retry configuration: each model is attempted once.
+        total_attempts = 1 if rotate_models else retry_count + 1
+        for attempt_number in range(1, total_attempts + 1):
             # Case 1: Standard Provider (or fallback)
-            if not subproviders_ordering or len(subproviders_ordering) <= 0 or model_fallback_rule["use_provider_order_as_fallback"]== False: 
+            if (
+                not subproviders_ordering
+                or not model_fallback_rule.get("use_provider_order_as_fallback", False)
+            ):
 
                 if( subproviders_ordering and len(subproviders_ordering) > 0):
                     logging.info(f"Attempting model '{provider_model}' in provider: '{provider_name}' and subproviders ordering: {subproviders_ordering}")
@@ -139,19 +181,22 @@ async def chat_completions(request: Request):
                     payload["allow_fallbacks"] = False
 
                 # Make the request
-                response_data, error_detail = await make_llm_request(target_url, headers, payload, is_streaming)
+                response_data, error_detail = await make_llm_request(
+                    http_client, target_url, headers, payload, is_streaming
+                )
                 #response_data = None # for debugging only
                 #error_detail = 'test error' # for debugging only
 
-                if response_data and error_detail is None:
+                if response_data is not None and error_detail is None:
                     logging.info(f"Connection success to model '{provider_model}' in provider '{provider_name}'. {'Starting streaming' if is_streaming else 'Waiting'} response...")
                     return response_data # Success! Return the response.
                 else:
-                    payload["messages"] = "<REMOVED>" # Remove messages from payload for logging
+                    payload_for_log = copy.deepcopy(payload)
+                    payload_for_log["messages"] = "<REMOVED>"
                     logging.warning(f"Failed attempt with model '{provider_model}' via '{provider_name}'.\r\n" \
                                     f"Error: {error_detail}\r\n" \
                                     f"Target Url: {target_url}\r\n" \
-                                    f"Payload: {payload}")
+                                    f"Payload: {payload_for_log}")
                     last_error_detail = f"Model {provider_model} failed with provider '{provider_name}': {error_detail}"
                     logging.debug(f"Continuing to next provider after attempt failed for '{provider_model}' in '{provider_name}'.") # Added log
 
@@ -169,12 +214,14 @@ async def chat_completions(request: Request):
 
                     # Make the request for this specific sub-provider
                     
-                    response_data, error_detail = await make_llm_request(target_url, headers, payload, is_streaming)
+                    response_data, error_detail = await make_llm_request(
+                        http_client, target_url, headers, payload, is_streaming
+                    )
                     #response_data = None # for debugging only
                     #error_detail = 'test error' # for debugging only
 
                         
-                    if response_data and error_detail is None:
+                    if response_data is not None and error_detail is None:
                         logging.info(f"Connection success with model '{provider_model}' in provider '{provider_name}' via '{sub_provider}'. {'Starting streaming' if is_streaming else 'Received'} response...")
                         return response_data # Success! Return the response.
                     else:
@@ -188,10 +235,15 @@ async def chat_completions(request: Request):
                 # If all sub-providers failed, continue to the next main provider in the outer loop
                 logging.warning(f"All sub-providers for '{provider_name}' failed.")
 
-            if retry_count > 0 and retry_delay>0 and retry_delay<120:
-                logging.info(f"RETRYING {provider_model} in {retry_delay} seconds... {retry_count-1} attempts left.")
+            if attempt_number < total_attempts:
+                remaining_attempts = total_attempts - attempt_number
+                logging.info(
+                    "RETRYING %s in %s seconds... %s attempts left.",
+                    provider_model,
+                    retry_delay,
+                    remaining_attempts,
+                )
                 await asyncio.sleep(retry_delay)
-            retry_count -= 1
 
     # 3. If all providers failed
     logging.error(f"All providers failed for model '{requested_model}'. Last error: {last_error_detail}")

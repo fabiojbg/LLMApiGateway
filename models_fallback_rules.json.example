@@ -53,6 +53,7 @@
                 "provider": "xAI",
                 "model" : "grok-3-mini-beta",                
                 "custom_body_params" : {
+                    "override": true,            // when true, overrides parameters sent by caller instead of only filling missing ones
                     "reasoning_effort" : "high"  // grok has this reasoning_effort parameter that can be set here
                 },
                 "custom_headers" : {

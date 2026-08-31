@@ -4,8 +4,6 @@ import uuid
 import json
 from fastapi import Request
 from typing import Callable
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
 
 # Use a logger specific to this module
 #logger = logging.getLogger(__name__)

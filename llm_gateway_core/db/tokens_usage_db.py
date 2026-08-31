@@ -4,6 +4,11 @@ import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 
+
+class TokensUsageDBError(RuntimeError):
+    """Raised when a token-usage database operation cannot be completed."""
+
+
 class TokensUsageDB:
     def __init__(self, db_filename: str = "tokens_usage.db"):
         """
@@ -82,7 +87,7 @@ class TokensUsageDB:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
-            query = f"""
+            query = """
             SELECT
                 id,
                 timestamp,
@@ -109,9 +114,11 @@ class TokensUsageDB:
             logging.debug(f"Retrieved {len(results)} latest token usage records (limit={limit}, offset={offset}).")
             return results
 
-        except Exception as e:
+        except sqlite3.Error as e:
             logging.error(f"Error retrieving latest token usage records: {str(e)}")
-            return []
+            raise TokensUsageDBError(
+                "Could not retrieve latest token usage records."
+            ) from e
         finally:
             if conn:
                 conn.close()
@@ -161,13 +168,16 @@ class TokensUsageDB:
             if conn:
                 conn.close()
 
-    def cleanup_old_records(self, retention_days: int = 180):
+    def cleanup_old_records(self, retention_days: int = 180) -> int:
         """
         Remove records older than the specified retention period.
 
         Args:
             retention_days: Number of days to keep records (default 180 for 6 months)
         """
+        if retention_days < 0:
+            raise ValueError("retention_days must be zero or greater.")
+
         conn = None
         try:
             conn = sqlite3.connect(self.db_path)
@@ -188,11 +198,15 @@ class TokensUsageDB:
                 logging.info(f"Cleaned up {deleted_count} old token usage records (older than {retention_days} days)")
             else:
                 logging.debug("No old token usage records to clean up")
-                
-        except Exception as e:
+
+            return deleted_count
+        except sqlite3.Error as e:
             logging.error(f"Error cleaning up old token usage records: {str(e)}")
             if conn:
                 conn.rollback()
+            raise TokensUsageDBError(
+                "Could not clean up old token usage records."
+            ) from e
         finally:
             if conn:
                 conn.close()
@@ -212,9 +226,11 @@ class TokensUsageDB:
             count = cursor.fetchone()[0]
             logging.debug(f"Total number of token usage records: {count}")
             return count
-        except Exception as e:
+        except sqlite3.Error as e:
             logging.error(f"Error retrieving total token usage records count: {str(e)}")
-            return 0
+            raise TokensUsageDBError(
+                "Could not retrieve the token usage record count."
+            ) from e
         finally:
             if conn:
                 conn.close()
@@ -293,12 +309,13 @@ class TokensUsageDB:
             logging.debug(f"Retrieved aggregated token usage for period '{period}'. Records found: {len(results)}")
             return results
 
-        except ValueError as ve:
-            logging.error(f"Invalid period specified for tokens usage aggregation: {ve}")
-            return []
-        except Exception as e:
+        except ValueError:
+            raise
+        except sqlite3.Error as e:
             logging.error(f"Error retrieving aggregated token usage for period '{period}': {str(e)}")
-            return []
+            raise TokensUsageDBError(
+                "Could not retrieve aggregated token usage."
+            ) from e
         finally:
             if conn:
                 conn.close()

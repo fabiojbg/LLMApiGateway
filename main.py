@@ -1,6 +1,8 @@
+import asyncio
 import logging
+import httpx
 import uvicorn
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +19,7 @@ from llm_gateway_core.middleware.chat_logging import log_chat_completions # Func
 from llm_gateway_core.api.v1 import router as api_v1_router
 from llm_gateway_core.api.v1.rules_editor import editor_router as api_v1_editor_router # Import the new editor router
 from llm_gateway_core.api.v1.stats import stats_router as api_v1_stats_router # Import the new stats router
-from llm_gateway_core.db.tokens_usage_db import TokensUsageDB # Import TokensUsageDB
+from llm_gateway_core.db.tokens_usage_db import TokensUsageDB, TokensUsageDBError
 
 # --- Application Setup ---
 
@@ -42,13 +44,39 @@ async def lifespan(app: FastAPI):
     app.state.tokens_usage_db = tokens_usage_db
     logger.info("TokensUsageDB initialized and attached to app.state.")
 
+    try:
+        deleted_count = await asyncio.to_thread(
+            tokens_usage_db.cleanup_old_records,
+            settings.tokens_usage_retention_days,
+        )
+        logger.info(
+            "Token usage retention cleanup completed; %s records removed.",
+            deleted_count,
+        )
+    except (TokensUsageDBError, ValueError):
+        logger.exception(
+            "Token usage retention cleanup failed; application startup will continue."
+        )
+
+    http_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(
+            connect=settings.http_connect_timeout,
+            read=settings.http_read_timeout,
+            write=settings.http_write_timeout,
+            pool=settings.http_pool_timeout,
+        )
+    )
+    app.state.http_client = http_client
+    logger.info("Shared downstream HTTP client initialized.")
+
     # Initialize other resources here if needed
     # Example: await database.connect()
-    yield
-    logger.info("Application shutdown...")
-    # Clean up resources here if needed
-    # Example: await database.disconnect()
-    # Example: await http_client.aclose() # If using a shared client
+    try:
+        yield
+    finally:
+        logger.info("Application shutdown...")
+        await http_client.aclose()
+        logger.info("Shared downstream HTTP client closed.")
 
 # Create FastAPI app instance
 # Determine project root for static files

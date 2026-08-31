@@ -1,16 +1,12 @@
 import logging
 import os
 import httpx
-import json5
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 # Relative imports from the new structure
 from ...config.settings import settings
 
 logger = logging.getLogger(__name__)
-
-# Initialize HTTP client (consider sharing a client instance across the app via dependency injection later)
-http_client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0)) # Shorter timeout for models endpoint
 
 router = APIRouter()
 
@@ -228,6 +224,7 @@ async def get_models(request: Request):
     routing rules and the configured fallback provider.
     """
     config_loader = request.app.state.config_loader
+    http_client: httpx.AsyncClient = request.app.state.http_client
     fallback_rules = config_loader.fallback_rules
     providers_config = config_loader.providers_config
 
@@ -291,7 +288,7 @@ async def get_models(request: Request):
                             else:
                                 logger.warning(f"Unexpected format in response from {target_url}. 'data' field missing or not a list.")
 
-                        except (json5.JSONDecodeError, ValueError) as json_err: # Use standard json or ValueError
+                        except ValueError:
                             logger.error(f"Invalid JSON response fetching models from {target_url}: {response_fallback.text[:500]}...", exc_info=True)
 
                 except httpx.RequestError as e:
@@ -314,8 +311,3 @@ async def get_models(request: Request):
         "object": "list",
         "data": response_list
     }
-
-# Consider adding a shutdown event to close the httpx client if it's managed here
-# @router.on_event("shutdown")
-# async def shutdown_event():
-#     await http_client.aclose()

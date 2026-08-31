@@ -4,7 +4,11 @@ import logging
 from pathlib import Path
 
 class ModelRotationDB:
-    def __init__(self, db_filename: str = "llmgateway_rotation.db"):
+    def __init__(
+        self,
+        db_filename: str = "llmgateway_rotation.db",
+        database_timeout_seconds: float = 30.0,
+    ):
         """
         Initialize the database for tracking model rotation.
 
@@ -21,6 +25,9 @@ class ModelRotationDB:
         os.makedirs(db_dir, exist_ok=True)
 
         self.db_path = db_path
+        self._database_is_new = not db_path.exists()
+        self.database_timeout_seconds = database_timeout_seconds
+        self.busy_timeout_ms = max(1, int(database_timeout_seconds * 1000))
         self._init_db()
 
     def _init_db(self):
@@ -29,8 +36,13 @@ class ModelRotationDB:
         """
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(
+                self.db_path, timeout=self.database_timeout_seconds
+            )
             cursor = conn.cursor()
+            cursor.execute(f"PRAGMA busy_timeout = {self.busy_timeout_ms}")
+            if self._database_is_new:
+                cursor.execute("PRAGMA journal_mode = WAL")
 
             # Create table for tracking the last used model index for each API key and gateway model
             cursor.execute('''
@@ -71,31 +83,25 @@ class ModelRotationDB:
 
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-
-            # Get the current index
-            cursor.execute(
-                "SELECT last_model_index FROM model_rotation WHERE api_key = ? AND gateway_model = ?",
-                (api_key, gateway_model)
+            conn = sqlite3.connect(
+                self.db_path, timeout=self.database_timeout_seconds
             )
-            result = cursor.fetchone()
+            cursor = conn.cursor()
+            cursor.execute(f"PRAGMA busy_timeout = {self.busy_timeout_ms}")
 
-            if result is None:
-                # First time this API key and model are used
-                next_index = 0
-                cursor.execute(
-                    "INSERT INTO model_rotation (api_key, gateway_model, last_model_index) VALUES (?, ?, ?)",
-                    (api_key, gateway_model, next_index)
+            cursor.execute(
+                """
+                INSERT INTO model_rotation (
+                    api_key, gateway_model, last_model_index
                 )
-            else:
-                current_index = result[0]
-                # Calculate the next index with wraparound
-                next_index = (current_index + 1) % total_models
-                cursor.execute(
-                    "UPDATE model_rotation SET last_model_index = ? WHERE api_key = ? AND gateway_model = ?",
-                    (next_index, api_key, gateway_model)
-                )
+                VALUES (?, ?, 0)
+                ON CONFLICT(api_key, gateway_model) DO UPDATE SET
+                    last_model_index = (model_rotation.last_model_index + 1) % ?
+                RETURNING last_model_index
+                """,
+                (api_key, gateway_model, total_models),
+            )
+            next_index = cursor.fetchone()[0]
 
             conn.commit()
             return next_index

@@ -5,3 +5,13 @@ description = "LLM Gateway is a gateway to LLM Providers with advanced support f
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = ["fastapi", "httpx", "python-dotenv", "pydantic", "uvicorn", "python-json-logger", "pydantic_settings", "json5"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
