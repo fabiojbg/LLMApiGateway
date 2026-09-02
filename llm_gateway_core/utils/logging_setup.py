@@ -13,7 +13,7 @@ def configure_logging():
     # Note: This assumes the script is run from the project root
     # If run from within llm_gateway_core, the path might need adjustment
     # For now, keeping it relative to the expected execution context (root)
-    os.makedirs('logs', exist_ok=True)
+    os.makedirs('app_data/logs', exist_ok=True)
 
     dictConfig({
         'version': 1,
@@ -31,7 +31,7 @@ def configure_logging():
             },
             'file': {
                 'class': 'logging.handlers.RotatingFileHandler',
-                'filename': 'logs/gateway.log', # Path relative to project root
+                'filename': 'app_data/logs/gateway.log', # Path relative to project root
                 'maxBytes': 256000,
                 'backupCount': 5,
                 'formatter': 'json'

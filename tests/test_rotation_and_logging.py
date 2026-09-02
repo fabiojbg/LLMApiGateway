@@ -367,7 +367,7 @@ def test_concurrent_log_writes_use_unique_filenames(monkeypatch, tmp_path):
             )
         )
 
-    log_files = list((tmp_path / "logs").glob("*.txt"))
+    log_files = list((tmp_path / "app_data" / "logs").glob("*.txt"))
     assert len(log_files) == 40
     assert len({path.name for path in log_files}) == 40
 
@@ -381,7 +381,7 @@ def test_write_log_empty_response_writes_placeholder(monkeypatch, tmp_path):
     usage = chat_logging._default_tokens_usage()
     chat_logging.write_log({}, "{}", "", usage, UsageDB())
 
-    log_files = list((tmp_path / "logs").glob("*.txt"))
+    log_files = list((tmp_path / "app_data" / "logs").glob("*.txt"))
     assert len(log_files) == 1
     content = log_files[0].read_text(encoding="utf-8")
     assert (

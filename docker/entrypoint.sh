@@ -2,14 +2,14 @@
 set -e
 
 echo "LLM Gateway starting..."
-echo "Container logs can be persisted to host via volume mount to /app/logs."
-echo "Container database will be persisted to host via volume mount."
+echo "Container logs can be persisted to host via volume mount to /app/app_data/logs."
+echo "Container database will be persisted to host via volume mount to /app/app_data/db."
 
 # Create logs directory if it doesn't exist
-mkdir -p /app/logs
+mkdir -p /app/app_data/logs
 
 # Create directory for database if it doesn't exist
-mkdir -p /app/db
+mkdir -p /app/app_data/db
 
 # Flag to track if there are configuration errors
 CONFIG_ERROR=0

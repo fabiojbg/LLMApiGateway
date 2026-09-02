@@ -41,8 +41,11 @@ You must mantain this structure updated in case of any change in it or in file´
 ├── providers.json
 ├── pyproject.toml
 ├── requirements.txt
-├── db/                     # Keep the actual DB file location consistent
-│   └── llmgateway_rotation.db
+├── app_data/
+│   ├── db/                 # <--- SQLite database storage
+│   │   ├── llmgateway_rotation.db
+│   │   └── tokens_usage.db
+│   └── logs/               # <--- Runtime and chat log files
 ├── images/
 │   └── cline-example.png
 ├── llm_gateway_core/       # <--- Main Application Package
@@ -74,7 +77,6 @@ You must mantain this structure updated in case of any change in it or in file´
 │   └── utils/              # <--- Utility Functions
 │       ├── __init__.py
 │       └── logging_setup.py # <--- Logging configuration
-├── logs/                   # <--- Runtime log files (structure unchanged)
 ├── static/                 # <--- Static files for the web editor
 │   ├── editor.html         # <--- HTML for the rules editor
 │   ├── editor.css          # <--- CSS for the rules editor

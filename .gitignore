@@ -113,7 +113,7 @@ Include/
 pg/
 __pycache__/
 llmgateway/
-logs/
+logs/*
 uv.lock
 db/llmgateway_rotation.db
 db/tokens_usage.db
@@ -141,7 +141,14 @@ dmypy.json
 .pytype/
 
 # Suggested docker volume
-data/
+docker_volumes/db/*
+!docker_volumes/db/dir.txt
+!docker_volumes/logs/
+docker_volumes/logs/*
+!docker_volumes/logs/dir.txt
+
+app_data/db/*
+app_data/logs/*
 
 # IDE - VSCode
 .vscode/*
@@ -150,7 +157,6 @@ data/
 !.vscode/launch.json
 !.vscode/extensions.json
 !.vscode/code-actions-on-save.json
-
 
 # Cython debug symbols
 cython_debug/

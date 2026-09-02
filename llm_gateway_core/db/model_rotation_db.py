@@ -14,12 +14,16 @@ class ModelRotationDB:
 
         Args:
             db_filename: The name of the SQLite database file.
-                         It will be created in a 'db' directory at the project root.
+                         It will be created in a 'app_data/db' directory at the project root.
         """
         # Determine project root (assuming this file is in llm_gateway_core/db)
         project_root = Path(__file__).parent.parent.parent
-        db_dir = project_root / "db" # Place DB in a root-level 'db' directory
-        db_path = db_dir / db_filename
+        db_path = Path(db_filename)
+        if db_path.is_absolute():
+            db_dir = db_path.parent
+        else:
+            db_dir = project_root / "app_data" / "db"
+            db_path = db_dir / db_filename
 
         # Ensure the directory exists
         os.makedirs(db_dir, exist_ok=True)
@@ -29,7 +33,6 @@ class ModelRotationDB:
         self.database_timeout_seconds = database_timeout_seconds
         self.busy_timeout_ms = max(1, int(database_timeout_seconds * 1000))
         self._init_db()
-
     def _init_db(self):
         """
         Initialize the database schema if it doesn't exist.

@@ -78,8 +78,8 @@ def write_log(
             f"{division_line}\nRequest Body:\n-{division_line}\n\n{req_body_str}\n\n"
             f"{division_line}\nLLM Response:\n{division_line}\n\n{response_text}"
         )
-        os.makedirs("logs", exist_ok=True)
-        log_path = os.path.join("./logs", filename)
+        os.makedirs("app_data/logs", exist_ok=True)
+        log_path = os.path.join("app_data", "logs", filename)
 
         with open(log_path, "x", encoding="utf-8") as log_file:
             log_content = log_content.replace("\\n\\n", "\r\n\r\n").replace(
@@ -100,7 +100,7 @@ def write_log(
             )
 
         log_files = sorted(
-            glob.glob(os.path.join("./logs", "*.txt")), key=os.path.getmtime
+            glob.glob(os.path.join("app_data", "logs", "*.txt")), key=os.path.getmtime
         )
         max_logs = settings.log_file_limit or 50
         while len(log_files) > max_logs:

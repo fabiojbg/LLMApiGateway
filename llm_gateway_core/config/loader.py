@@ -93,10 +93,12 @@ class ConfigLoader:
         self,
         providers_filename: str = "providers.json",
         fallback_rules_filename: str = "models_fallback_rules.json",
+        temp_dir: Optional[Path] = None,
     ):
         project_root = Path(__file__).parent.parent.parent
         self.providers_path = project_root / providers_filename
         self.fallback_rules_path = project_root / fallback_rules_filename
+        self.temp_dir = temp_dir if temp_dir is not None else (project_root / "app_data")
         self.providers_config: Dict[str, ProviderDetails] = {}
         self.fallback_rules: Dict[str, Dict[str, Any]] = {}
         self._update_lock = threading.RLock()
@@ -332,10 +334,16 @@ class ConfigLoader:
                 f"Could not read configuration file {path}: {error}"
             ) from error
 
-    @staticmethod
-    def _atomic_write(path: Path, payload_text: str) -> None:
+    def _atomic_write(
+        self,
+        path: Path,
+        payload_text: str,
+        temp_dir: Optional[Path] = None,
+    ) -> None:
+        target_temp_dir = temp_dir or self.temp_dir
         temporary_path: Optional[Path] = None
         try:
+            target_temp_dir.mkdir(parents=True, exist_ok=True)
             path.parent.mkdir(parents=True, exist_ok=True)
             with tempfile.NamedTemporaryFile(
                 mode="w",
@@ -343,7 +351,7 @@ class ConfigLoader:
                 newline="",
                 prefix=f".{path.name}.",
                 suffix=".tmp",
-                dir=path.parent,
+                dir=target_temp_dir,
                 delete=False,
             ) as temporary_file:
                 temporary_path = Path(temporary_file.name)
@@ -351,8 +359,17 @@ class ConfigLoader:
                 temporary_file.flush()
                 os.fsync(temporary_file.fileno())
 
-            os.replace(temporary_path, path)
-            temporary_path = None
+            try:
+                os.replace(temporary_path, path)
+                temporary_path = None
+            except OSError:
+                # In containerized environments (e.g. Docker with single-file bind mounts),
+                # os.replace can fail with EBUSY (mount point) or EXDEV (cross-device link).
+                # In this case, fall back to writing directly to the target file.
+                with open(path, "w", encoding="utf-8", newline="") as dest_file:
+                    dest_file.write(payload_text)
+                    dest_file.flush()
+                    os.fsync(dest_file.fileno())
         except Exception as error:
             raise ConfigPersistenceError(
                 f"Could not persist configuration file {path}: {error}"

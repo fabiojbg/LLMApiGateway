@@ -27,6 +27,7 @@ def config_loader(monkeypatch, tmp_path):
     loader = ConfigLoader()
     loader.providers_path = tmp_path / "providers.json"
     loader.fallback_rules_path = tmp_path / "models_fallback_rules.json"
+    loader.temp_dir = tmp_path / "app_data"
     loader.providers_config = {
         "known": ProviderDetails(baseUrl="https://known.test/v1", apikey="APIKEY_KNOWN")
     }
@@ -157,10 +158,9 @@ def test_atomic_update_preserves_comments_exactly(config_loader, target):
     assert path.read_text(encoding="utf-8") == payload
 
 
-@pytest.mark.parametrize("failure_point", ["fsync", "replace"])
 @pytest.mark.parametrize("target", ["rules", "providers"])
 def test_persistence_failure_preserves_file_state_and_removes_temporary(
-    monkeypatch, config_loader, target, failure_point
+    monkeypatch, config_loader, target
 ):
     if target == "rules":
         path = config_loader.fallback_rules_path
@@ -179,9 +179,9 @@ def test_persistence_failure_preserves_file_state_and_removes_temporary(
         payload = providers_payload("known", "new")
 
     def fail(*_args, **_kwargs):
-        raise OSError(f"simulated {failure_point} failure")
+        raise OSError("simulated fsync failure")
 
-    monkeypatch.setattr(os, failure_point, fail)
+    monkeypatch.setattr(os, "fsync", fail)
 
     with pytest.raises(ConfigPersistenceError, match="Could not persist"):
         apply(payload)
@@ -193,7 +193,39 @@ def test_persistence_failure_preserves_file_state_and_removes_temporary(
     )
     assert path.read_text(encoding="utf-8") == original
     assert current_state == state_before
-    assert list(path.parent.glob(f".{path.name}.*.tmp")) == []
+    assert list(config_loader.temp_dir.glob(f".{path.name}.*.tmp")) == []
+
+
+@pytest.mark.parametrize("target", ["rules", "providers"])
+def test_atomic_write_falls_back_when_os_replace_fails_on_bind_mount(
+    monkeypatch, config_loader, target
+):
+    if target == "rules":
+        path = config_loader.fallback_rules_path
+        original = rule_payload("gateway/original")
+        path.write_text(original, encoding="utf-8")
+        config_loader.reload_fallback_rules()
+        apply = config_loader.apply_fallback_rules
+        payload = rule_payload("gateway/new")
+    else:
+        path = config_loader.providers_path
+        original = providers_payload("known")
+        path.write_text(original, encoding="utf-8")
+        apply = config_loader.apply_providers
+        payload = providers_payload("known", "new")
+
+    def fail_replace(src, dst):
+        # Simulate Linux docker bind-mount Errno 16 Device or resource busy
+        raise OSError(16, "Device or resource busy")
+
+    monkeypatch.setattr(os, "replace", fail_replace)
+
+    # Should succeed via the direct-write fallback without raising
+    apply(payload)
+
+    assert path.read_text(encoding="utf-8") == payload
+    # Temporary file in temp_dir should be deleted
+    assert list(config_loader.temp_dir.glob(f".{path.name}.*.tmp")) == []
 
 
 @pytest.mark.asyncio
@@ -311,3 +343,22 @@ def test_valid_retry_configuration_is_preserved(config_loader):
     retry_rule = config_loader.fallback_rules["gateway/retry"]["fallback_models"][0]
     assert retry_rule["retry_count"] == 2
     assert retry_rule["retry_delay"] == 5
+
+
+def test_atomic_write_creates_temp_file_in_temp_dir(monkeypatch, config_loader):
+    recorded_dirs = []
+    original_named_temporary_file = loader_module.tempfile.NamedTemporaryFile
+
+    def tracking_named_temporary_file(*args, **kwargs):
+        recorded_dirs.append(kwargs.get("dir"))
+        return original_named_temporary_file(*args, **kwargs)
+
+    monkeypatch.setattr(
+        loader_module.tempfile, "NamedTemporaryFile", tracking_named_temporary_file
+    )
+
+    payload = rule_payload("gateway/temp-test")
+    config_loader.apply_fallback_rules(payload)
+
+    assert recorded_dirs == [config_loader.temp_dir]
+    assert config_loader.fallback_rules_path.read_text(encoding="utf-8") == payload

@@ -50,8 +50,8 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Create necessary directories
-RUN mkdir -p /app/logs /app/db && \
-    chown -R llmgateway:llmgateway /app/logs /app/db
+RUN mkdir -p /app/app_data/logs /app/app_data/db && \
+    chown -R llmgateway:llmgateway /app/app_data/logs /app/app_data/db
 
 # Copy application code
 COPY --exclude=docker . /app/
