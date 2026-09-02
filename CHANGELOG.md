@@ -1,3 +1,27 @@
+[v1.20]
+---
+### Architecture & Testing
+- **Project Refactoring & Comprehensive Test Suite**:
+  - Refactored core modules into a clean architecture separating API routers, configuration loading (`ConfigLoader`), request handling, SQLite databases, and middleware.
+  - Added centralized Pydantic settings management (`settings.py`) and managed downstream HTTP client lifespan.
+  - Implemented extensive pytest test suite covering chat fallback, rotation concurrency, streaming/non-streaming responses, configuration reload, and token usage persistence.
+
+### Data Organization & Docker
+- **Relocated Data & Logs to `app_data/`**:
+  - Reorganized local SQLite database storage (`llmgateway_rotation.db`, `tokens_usage.db`) and log files under the new `app_data/` folder (`app_data/db/` and `app_data/logs/`).
+  - Updated Docker configurations and entrypoints to map data volumes cleanly under `docker_volumes/`.
+
+### Logging & Database
+- **Enhanced Chat & Token Logging in Database**:
+  - Improved request logging and token usage recording in SQLite for both streaming and non-streaming responses.
+  - Added diagnostic messaging in chat logs explaining possible causes when an LLM produces no response content.
+
+### Bug Fixes
+- **Dynamic Model Lists & Integrations**:
+  - Fixed an issue where `/v1/models`, `/AsOpenCodeFormat`, and `/AsGitHubCopilotFormat` endpoints did not dynamically reflect updated fallback rules and provider configurations from application state.
+- **Fix /chat/completions authorization**: the /chat/completions endpoint was not working when the GATEWAY_API_KEY was set.
+
+
 [v1.11]
 ---
 ### Features
