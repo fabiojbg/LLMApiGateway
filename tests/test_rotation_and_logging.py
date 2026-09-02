@@ -249,10 +249,12 @@ async def test_call_next_error_persists_once_and_propagates(monkeypatch):
         raise RuntimeError("endpoint failed")
 
     with pytest.raises(RuntimeError, match="endpoint failed"):
-        await chat_logging.log_chat_completions(_request(), failed_call_next)
+        await chat_logging.log_chat_completions(_request(body=b'{"model":"custom/error-model"}'), failed_call_next)
 
     assert len(writes) == 1
     assert writes[0][2] == ""
+    assert writes[0][3]["model"] == "custom/error-model"
+    assert writes[0][3]["provider"] == "ERR: RuntimeError"
 
 
 @pytest.mark.asyncio
@@ -270,7 +272,7 @@ async def test_stream_cancellation_persists_once(monkeypatch):
         response_body(), media_type="text/event-stream"
     )
     response = await chat_logging.log_chat_completions(
-        _request(), lambda _: asyncio.sleep(0, result=upstream_response)
+        _request(body=b'{"model":"custom/stream-model"}'), lambda _: asyncio.sleep(0, result=upstream_response)
     )
     iterator = response.body_iterator
     await anext(iterator)
@@ -282,6 +284,29 @@ async def test_stream_cancellation_persists_once(monkeypatch):
 
     assert len(writes) == 1
     assert writes[0][2] == "before-cancel"
+    assert writes[0][3]["model"] == "custom/stream-model"
+    assert writes[0][3]["provider"] == "CLIENT_ABORTED"
+
+
+@pytest.mark.asyncio
+async def test_http_error_response_persists_model_and_error_detail(monkeypatch):
+    writes = []
+    monkeypatch.setattr(chat_logging, "write_log", lambda *args: writes.append(args))
+    upstream_response = JSONResponse(
+        {"detail": "All configured providers failed for model 'test-model'"},
+        status_code=503,
+    )
+
+    response = await chat_logging.log_chat_completions(
+        _request(body=b'{"model":"llmgateway/test-model"}'),
+        lambda _: asyncio.sleep(0, result=upstream_response),
+    )
+
+    assert response.status_code == 503
+    assert len(writes) == 1
+    assert writes[0][3]["model"] == "llmgateway/test-model"
+    assert "ERR:503" in writes[0][3]["provider"]
+    assert "All configured providers failed" in writes[0][3]["provider"]
 
 
 @pytest.mark.asyncio

@@ -112,6 +112,19 @@ def write_log(
         logger.error("Failed to write chat log: %s", exc, exc_info=True)
 
 
+def _extract_requested_model(req_body_str: str) -> str | None:
+    try:
+        if req_body_str:
+            data = json5.loads(req_body_str)
+            if isinstance(data, dict):
+                model = data.get("model")
+                if isinstance(model, str) and model.strip():
+                    return model.strip()
+    except Exception:
+        pass
+    return None
+
+
 class ChatLogCollector:
     """Incrementally parses a response while retaining only bounded log text."""
 
@@ -133,8 +146,12 @@ class ChatLogCollector:
             if response_max_chars is not None
             else settings.log_chat_response_max_chars,
         )
+        self.requested_model = _extract_requested_model(req_body_str)
         self.llm_response_accum = ""
         self.tokens_usage = _default_tokens_usage()
+        if self.requested_model:
+            self.tokens_usage["model"] = self.requested_model
+        self.error_provider: str | None = None
         self._decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         self._event_buffer = ""
         self._non_stream_body_parts: list[str] = []
@@ -155,12 +172,14 @@ class ChatLogCollector:
             if self._event_buffer.strip():
                 self._process_event(self._event_buffer)
             self._event_buffer = ""
-            return
+        else:
+            response_body = "".join(self._non_stream_body_parts)
+            self._non_stream_body_parts.clear()
+            if response_body:
+                self._process_json_payload(response_body)
 
-        response_body = "".join(self._non_stream_body_parts)
-        self._non_stream_body_parts.clear()
-        if response_body:
-            self._process_json_payload(response_body)
+        if not self.tokens_usage.get("provider") and self.error_provider:
+            self.tokens_usage["provider"] = self.error_provider
 
     async def persist_once(self) -> None:
         if self._persist_started:
@@ -227,9 +246,35 @@ class ChatLogCollector:
                     self._append_response(message.get("content"))
 
             if "usage" in chunk_data:
-                self.tokens_usage = get_token_usage(chunk_data)
+                usage_extracted = get_token_usage(chunk_data)
+                if not usage_extracted.get("model") and self.requested_model:
+                    usage_extracted["model"] = self.requested_model
+                if not usage_extracted.get("provider") and self.tokens_usage.get("provider"):
+                    usage_extracted["provider"] = self.tokens_usage["provider"]
+                self.tokens_usage = usage_extracted
+            elif "model" in chunk_data and isinstance(chunk_data["model"], str) and chunk_data["model"].strip():
+                self.tokens_usage["model"] = chunk_data["model"].strip()
+
+            if "provider" in chunk_data and isinstance(chunk_data["provider"], str) and chunk_data["provider"].strip():
+                self.tokens_usage["provider"] = chunk_data["provider"].strip()
+
             if "error" in chunk_data:
                 self._append_response(payload)
+                error_obj = chunk_data.get("error")
+                error_msg = ""
+                if isinstance(error_obj, dict):
+                    error_msg = str(error_obj.get("message") or error_obj)
+                elif error_obj:
+                    error_msg = str(error_obj)
+                if error_msg:
+                    prefix = f"{self.error_provider} " if self.error_provider else "ERR: "
+                    self.tokens_usage["provider"] = f"{prefix}({error_msg[:100]})"
+            elif "detail" in chunk_data:
+                detail = str(chunk_data.get("detail", "")).strip()
+                if detail:
+                    self._append_response(payload)
+                    prefix = f"{self.error_provider} " if self.error_provider else "ERR: "
+                    self.tokens_usage["provider"] = f"{prefix}({detail[:100]})"
         except Exception as exc:
             logger.error(
                 "ChatLogging: error processing response payload: %s: %s",
@@ -272,8 +317,14 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
     usage_db = _request_usage_db(request)
     try:
         response = await call_next(request)
-    except BaseException:
+    except asyncio.CancelledError:
         collector = ChatLogCollector(req_headers, req_body_str, False, usage_db)
+        collector.tokens_usage["provider"] = "CLIENT_ABORTED"
+        await collector.persist_once()
+        raise
+    except BaseException as exc:
+        collector = ChatLogCollector(req_headers, req_body_str, False, usage_db)
+        collector.tokens_usage["provider"] = f"ERR: {type(exc).__name__}"
         await collector.persist_once()
         raise
 
@@ -289,6 +340,8 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
         is_event_stream,
         usage_db,
     )
+    if response.status_code >= 400:
+        collector.error_provider = f"ERR:{response.status_code}"
 
     if is_streaming_response:
         original_iterator = response.body_iterator
@@ -298,6 +351,14 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
                 async for chunk in original_iterator:
                     collector.feed(chunk)
                     yield chunk
+            except asyncio.CancelledError:
+                if not collector.tokens_usage.get("provider"):
+                    collector.tokens_usage["provider"] = "CLIENT_ABORTED"
+                raise
+            except BaseException as exc:
+                if not collector.tokens_usage.get("provider"):
+                    collector.tokens_usage["provider"] = f"ERR: {type(exc).__name__}"
+                raise
             finally:
                 collector.finish()
                 await collector.persist_once()
@@ -308,6 +369,8 @@ async def log_chat_completions(request: Request, call_next: Callable) -> Respons
         if body:
             collector.feed(body)
         collector.finish()
+        if response.status_code >= 400 and not collector.tokens_usage.get("provider"):
+            collector.tokens_usage["provider"] = f"ERR:{response.status_code}"
         await collector.persist_once()
 
     return response
