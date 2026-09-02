@@ -14,7 +14,7 @@ async def api_key_auth(request: Request, call_next):
     logging.debug(f"INCOMING REQUEST: {request.method} {request.url.path}") # <-- Log incoming request
 
     # Skip auth for health checks or other public endpoints
-    if not request.url.path.endswith("/chat/completion"):
+    if not request.url.path.endswith("/chat/completions"):
         response = await call_next(request)
         return response
 
