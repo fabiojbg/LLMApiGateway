@@ -58,6 +58,11 @@ def write_log(
             if "provider" in tokens_usage
             else ""
         )
+        response_text = (
+            llm_response_accum
+            if llm_response_accum and llm_response_accum.strip()
+            else "<No content. This may be caused by the call to 'tools' or 'mcps' as the model's last request>"
+        )
         log_content = (
             f"{division_line}\nTokens Usage:\n-{division_line}\n\n"
             f"Input: {tokens_usage['prompt_tokens']}\n"
@@ -71,7 +76,7 @@ def write_log(
             f"{division_line}\nRequest Headers:\n{division_line}\n\n"
             f"{pformat(req_headers, indent=2)}\n\n"
             f"{division_line}\nRequest Body:\n-{division_line}\n\n{req_body_str}\n\n"
-            f"{division_line}\nLLM Response:\n{division_line}\n\n{llm_response_accum}"
+            f"{division_line}\nLLM Response:\n{division_line}\n\n{response_text}"
         )
         os.makedirs("logs", exist_ok=True)
         log_path = os.path.join("./logs", filename)

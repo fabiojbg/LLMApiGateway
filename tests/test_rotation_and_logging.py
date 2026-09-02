@@ -345,3 +345,22 @@ def test_concurrent_log_writes_use_unique_filenames(monkeypatch, tmp_path):
     log_files = list((tmp_path / "logs").glob("*.txt"))
     assert len(log_files) == 40
     assert len({path.name for path in log_files}) == 40
+
+
+def test_write_log_empty_response_writes_placeholder(monkeypatch, tmp_path):
+    class UsageDB:
+        def insert_usage(self, _tokens_usage):
+            return None
+
+    monkeypatch.chdir(tmp_path)
+    usage = chat_logging._default_tokens_usage()
+    chat_logging.write_log({}, "{}", "", usage, UsageDB())
+
+    log_files = list((tmp_path / "logs").glob("*.txt"))
+    assert len(log_files) == 1
+    content = log_files[0].read_text(encoding="utf-8")
+    assert (
+        "<No content. This may be caused by the call to 'tools' or 'mcps' as the model's last request>"
+        in content
+    )
+
